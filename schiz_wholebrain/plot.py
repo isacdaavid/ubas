@@ -37,10 +37,10 @@ def spectrum(controls, patients, xlim, xlabel="", ylabel="Power"):
     plt.figure()
     for control in controls:
         freq = np.fft.fftfreq(control.shape[0], sample_rate)
-        plt.plot(freq, np.abs(control) ** 2, color='blue', alpha=1)
+        plt.plot(freq, control, color='blue', alpha=1)
     for patient in patients:
         freq = np.fft.fftfreq(patient.shape[0], sample_rate)
-        plt.plot(freq, np.abs(patient) ** 2, color='orange', alpha=1)
+        plt.plot(freq, patient, color='orange', alpha=1)
     plt.xlabel(xlabel, fontsize=14)
     plt.ylabel(ylabel, fontsize=14)
     plt.xlim(*xlim)
