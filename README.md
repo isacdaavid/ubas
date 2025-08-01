@@ -10,18 +10,36 @@
 [![Twitter](https://img.shields.io/twitter/url/http/shields.io.svg?style=social&label=Twitter)](https://twitter.com/schiz_wholebrain)
 -->
 
-[![Project generated with PyScaffold](https://img.shields.io/badge/-PyScaffold-005CA0?logo=pyscaffold)](https://pyscaffold.org/)
-
 # schiz_wholebrain
 
-> Add a short description here!
+> A library to bride the gap between BIDS connectivity data and
+> whole-brain simulation.
 
-A longer description of your project goes here...
+in progress...
 
 
-<!-- pyscaffold-notes -->
+## Installation
 
-## Note
+```{shell}
+git clone https://github.com/isacdaavid/schiz_wholebrain.git
+```
 
-This project has been set up using PyScaffold 4.6. For details and usage
-information on PyScaffold see https://pyscaffold.org/.
+A conda environment is recommended. The repository is being developed
+and tested with Python 3.9.
+
+```{shell}
+conda create --name myenv python=3.9
+
+conda activate myenv
+```
+
+Make sure to install the dependencies listed in [setup.cfg](https://github.com/isacdaavid/schiz_wholebrain/blob/master/setup.cfg#L50). For instance:
+
+```{shell}
+pip install numpy pybids scipy tqdm
+```
+
+If you wish to run the accompanying Jupyter notebook:
+```{shell}
+pip install notebook matplotlib
+```
