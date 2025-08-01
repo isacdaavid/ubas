@@ -3,7 +3,6 @@ Classes to represent connectivity objects
 """
 
 import glob
-from types import SimpleNamespace
 
 import numpy as np
 
