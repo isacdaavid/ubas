@@ -72,14 +72,14 @@ def parse_args(args):
     Returns:
       :obj:`argparse.Namespace`: command line parameters namespace
     """
-    parser = argparse.ArgumentParser(description="Just a Fibonacci demonstration")
-    parser.add_argument(
+    myparser = argparse.ArgumentParser(description="Just a Fibonacci demonstration")
+    myparser.add_argument(
         "--version",
         action="version",
         version=f"schiz_wholebrain {__version__}",
     )
-    parser.add_argument(dest="n", help="n-th Fibonacci number", type=int, metavar="INT")
-    parser.add_argument(
+    myparser.add_argument(dest="n", help="n-th Fibonacci number", type=int, metavar="INT")
+    myparser.add_argument(
         "-v",
         "--verbose",
         dest="loglevel",
@@ -87,7 +87,7 @@ def parse_args(args):
         action="store_const",
         const=logging.INFO,
     )
-    parser.add_argument(
+    myparser.add_argument(
         "-vv",
         "--very-verbose",
         dest="loglevel",
@@ -95,7 +95,7 @@ def parse_args(args):
         action="store_const",
         const=logging.DEBUG,
     )
-    return parser.parse_args(args)
+    return myparser.parse_args(args)
 
 
 def setup_logging(loglevel):
@@ -108,7 +108,6 @@ def setup_logging(loglevel):
     logging.basicConfig(
         level=loglevel, stream=sys.stdout, format=logformat, datefmt="%Y-%m-%d %H:%M:%S"
     )
-
 
 def main(args):
     """Wrapper allowing :func:`fib` to be called with string arguments in a CLI fashion
