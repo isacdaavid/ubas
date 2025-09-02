@@ -6,13 +6,10 @@ import glob
 
 import numpy as np
 
-from load import load_matlab, load_tsv
+from .load import load_matlab, load_tsv
 
 
 class Connectivity():
-    def __repr__(self):
-        return str(type(self))
-
     @property
     def region_labels(self):
         return self._region_labels
@@ -37,6 +34,9 @@ class Connectivity():
 
         matrix = matrix + matrix.T
         return matrix / np.max(matrix)
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}"
 
 
 class FunctionalConnectivity(Connectivity):
