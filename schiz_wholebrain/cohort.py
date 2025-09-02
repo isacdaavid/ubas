@@ -1,3 +1,7 @@
+"""
+Class to represent a Cohort of Subjects.
+"""
+
 import concurrent.futures
 from typing import (
     Any,
@@ -27,11 +31,133 @@ from .subject import Subject
 
 
 class Cohort(set):
-    def __init__(self, subjects: Iterable[SubjectT]):
-        super().__init__()
+    """A specialized set to manage a cohort of Subjects in a study.
 
-        for subject in subjects:
-            self.add(subject)
+    Attributes:
+        labels: (Set[str]): The labels of all Subjects contained in this Cohort.
+    """
+
+    def __init__(self, subjects: Iterable[SubjectT]):
+        """Initialize a Cohort with an iterable of Subject objects.
+
+        Args:
+            subjects (Iterable[SubjectT]): Subject objects to include.
+
+        Example:
+            >>> subjects = [Subject('Álvaro'), Subject('Beatriz')]
+            >>> cohort = Cohort(subjects)
+            >>> print(len(cohort))
+            2
+        """
+        super().__init__(subjects)
+
+        # Cached label->Subject mapping for O(1) access.
+        self._label_to_subject = {subject.label: subject for subject in self}
+
+    @property
+    def labels(self) -> Set[str]:
+        """Set[str]: The labels of all Subjects contained in this Cohort.
+
+        Example:
+        >>> subjects = [Subject('Álvaro'), Subject('Beatriz')]
+        >>> cohort = Cohort(subjects)
+        >>> print(cohort.labels)
+        {'Álvaro', 'Beatriz'}
+        """
+        return {subject.label for subject in self}
+
+    def add(self, subject: SubjectT):
+        """Overloaded add() which also updates the Subject cache.
+
+        Args:
+            subject (SubjectT): The Subject to be added to this Cohort.
+
+        Returns:
+            None: Calling Cohort is extended or overwritten as side effect.
+
+        Example:
+            >>> subjects = [Subject('Álvaro'), Subject('Beatriz')]
+            >>> cohort = Cohort(subjects[0])
+            >>> print(len(cohort))
+            1
+            >>> cohort.add(subjects[1])
+            >>> print(len(cohort))
+            2
+        """
+        super().add(subject)
+        self._label_to_subject[subject.label] = subject
+
+    def remove(self, subject: SubjectT):
+        """Overloaded remove() which also updates the Subject cache.
+
+        Args:
+            subject (SubjectT): The Subject to be removed from this Cohort.
+
+        Returns:
+            None: Calling Cohort might be shrunk as side effect.
+
+        Raises:
+            KeyError: If the Subject to remove is not found.
+
+        Example:
+            >>> subjects = [Subject('Álvaro'), Subject('Beatriz')]
+            >>> cohort = Cohort(subjects)
+            >>> print(len(cohort))
+            2
+            >>> cohort.remove(subjects[0])
+            >>> print(len(cohort))
+            1
+        """
+        super().remove(subject)
+        del self._label_to_subject[subject.label]
+
+    def __getitem__(self, index: str) -> SubjectT:
+        """Retrieve a Subject from the Cohort by its label in O(1) time.
+
+        Args:
+            index (str): The label of Subject to be retrieved.
+
+        Returns:
+            SubjectT: The Subject for the specified label.
+
+        Raises:
+            KeyError: If the Subject to retrieve is not found.
+
+        Example:
+            >>> subjects = [Subject('Álvaro'), Subject('Beatriz')]
+            >>> cohort = Cohort(subjects)
+            >>> beatriz = cohort['Beatriz']
+            >>> print(beatriz.label)
+            'Beatriz'
+        """
+        try:
+            return self._label_to_subject[index]
+        except KeyError:
+            raise KeyError(f"No subject found with label: {index}")
+
+    def __contains__(self, item: Union[str, SubjectT]) -> bool:
+        """Check if a Subject or a subject label exists in the Cohort.
+
+        Args:
+            item (Union[str, SubjectT]): Subject or label whose membership will
+                be checked.
+
+        Returns:
+            bool: Whether the Subject or subject labels is part of this Cohort.
+
+        Example:
+            >>> subjects = [Subject('Álvaro'), Subject('Beatriz')]
+            >>> cohort = Cohort(subjects)
+            >>> print(subjects[0] in cohort)
+            True
+            >>> print('Beatriz' in cohort)
+            True
+            >>> print('Carlos' in cohort)
+            False
+        """
+        if isinstance(item, str):
+            return item in self._label_to_subject
+        return super().__contains__(item)
 
     @classmethod
     def cohort_from_data(
@@ -207,11 +333,6 @@ class Cohort(set):
 
             yield subject_demographics
 
-    @property
-    def labels(self) -> Set[str]:
-        """Set[str]: The labels of all Subjects contained in this Cohort."""
-        return {subject.label for subject in self}
-
     def collect(
         self,
         attr_name: str,
@@ -255,7 +376,7 @@ class Cohort(set):
                 yield (subject.label, default)
 
     def filter(self, condition: Callable[[SubjectT], bool]) -> 'Cohort':
-        """Create Cohort subset with Subjects that satisfy a condition.
+        """Create Cohort subset with Subjects who satisfy the condition.
 
         This method applies a user-provided function (`condition`) to each
         Subject in the Cohort. Only Subjects for which the function returns
@@ -281,9 +402,3 @@ class Cohort(set):
         """
         subcohort = filter(condition, self)
         return type(self)(subcohort)
-
-    def __getitem__(self, index: str) -> 'Subject':
-        for subject in self:
-            if subject.label == index:
-                return subject
-        raise KeyError(f"No subject found with label: {index}")
