@@ -1,16 +1,33 @@
 import concurrent.futures
-from typing import Any, Callable, Dict, Generator, Iterable, Set
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generator,
+    Iterable,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    TypeVar,
+    Union,
+)
+
+# Type variable for Subject or its subclasses
+SubjectT = TypeVar('SubjectT', bound='Subject')
+# Generic type for the attribute value
+T = TypeVar('T')
 
 from bids import BIDSLayout
 import numpy as np
 from tqdm import tqdm
 
-from load import load_matlab
-from subject import Subject
+from .load import load_matlab
+from .subject import Subject
 
 
 class Cohort(set):
-    def __init__(self, subjects: Iterable[Subject]):
+    def __init__(self, subjects: Iterable[SubjectT]):
         super().__init__()
 
         for subject in subjects:
@@ -24,6 +41,27 @@ class Cohort(set):
             functional_derivatives: BIDSLayout,
             atlases: Iterable = ['4S156', '4S256', '4S456'],
     ) -> 'Cohort':
+        """Constructs a pre-filled Cohort instance from data.
+
+        This class method skips manual creation of Subjects and creates a Cohort
+        by combining demographics data from a MATLAB file with structural and
+        functional neuroimaging data provided as BIDSLayout objects. Only
+        subjects with complete data are included in the Cohort. Concurrent
+        processing is used to load connectivity data.
+
+        Args:
+            demographics_file (str): Path to the MATLAB (.mat) file containing
+                demographics data. The file must contain an 'alldata' key with a
+                matrix value, where the first column represents subject labels.
+            structural_derivatives (BIDSLayout): Object pointing to the
+                directory containing tractography derivatives from QSIrecon.
+            functional_derivatives (BIDSLayout): Object pointing to the
+                directory containing functional derivatives from XCP-D.
+            atlases (Iterable[str]): Atlas names to load from connectivity data.
+
+        Returns:
+            Cohort: A Cohort instance containing Subject objects.
+        """
         all_demographics = cls._load_demographics_file(demographics_file)
         all_subject_labels = set(all_demographics[:, 0].tolist())
         structural_subject_labels = set(structural_derivatives.get_subjects())
@@ -86,7 +124,22 @@ class Cohort(set):
 
     @classmethod
     def _load_demographics_file(cls, path: str) -> np.ndarray:
-        """Load demographics data from MATLAB files."""
+        """Load and clean demographics data from MATLAB file.
+
+        Args:
+            path (str): Path to the MATLAB (.mat) file containing demographics
+                data. The file must contain an 'alldata' key with a matrix
+                value, where the first column represents subject labels.
+
+        Returns:
+            np.ndarray: A 2D NumPy array with the flattened demographics data
+
+        Raises:
+            FileNotFoundError: Exception is captured and error is printed.
+            KeyError: If the file dictionary is missing an 'alldata' field.
+            TypeError: If the array in the file contains unexpected elements.
+            ValueError: If the array in the file contains unexpected elements.
+        """
         try:
             all_data = load_matlab(path)
         except FileNotFoundError as error:
@@ -105,9 +158,37 @@ class Cohort(set):
     @classmethod
     def _demographics_generator(
             cls,
-            clean_data,
-            subject_labels: Iterable
+            clean_data: np.ndarray,
+            subject_labels: Sequence[str],
     ) -> Generator[Dict[str, Any], None, None]:
+        """Generates dictionaries of demographics data for select subjects.
+
+        This class method iterates over a sequence of subject labels and
+        extracts the corresponding demographics data from a preprocessed 2D
+        NumPy array (e.g. from `Cohort._load_demographics_file()`). For each
+        subject, it constructs a dictionary containing the subject's age, sex,
+        diagnosis ('HC' for healthy controls or 'SSD' for schizophrenia spectrum
+        disorder), plus a subdiagnosis category in case of 'SSD'.
+
+        Args:
+            clean_data (np.ndarray): 2D array with clean demographics data.
+            subject_labels (Sequence[str]): The subjects for which to generate
+                demographics.
+
+        Yields:
+            Generator[Dict[str, Any], None, None]: Dictionaries with demographics.
+
+        Example:
+            >>> clean_data = np.array([
+            ...     ['Álvaro', 30, 'M', 'No_Known_Disorder'],
+            ...     ['Beatriz', 12, 'F', 'Bipolar']
+            ... ])
+            >>> subject_labels = ['Beatriz']
+            >>> demo = Cohort._demographics_generator(clean_data, subject_labels)
+            >>> for d in demo:
+            ...     print(d)
+            {'age': 12, 'sex': 'F', 'subdiagnosis': 'Bipolar', 'diagnosis': 'SSD'}
+        """
         for label in subject_labels:
             # Select subject from cohort-wide demographics data.
             subject_demographics = clean_data[clean_data[:, 0] == label, :]
@@ -127,18 +208,81 @@ class Cohort(set):
             yield subject_demographics
 
     @property
-    def demographics(self) -> Dict[str, Dict]:
-        return {subject.label: subject.demographics for subject in self}
-
-    @property
     def labels(self) -> Set[str]:
+        """Set[str]: The labels of all Subjects contained in this Cohort."""
         return {subject.label for subject in self}
 
-    def filter(self, condition: Callable[[Subject], bool]):
+    def collect(
+        self,
+        attr_name: str,
+        default: Optional[T] = None
+    ) -> Generator[Tuple[str, Union[T, Any]], None, None]:
+        """Extracts a specific attribute from all Subjects in the Cohort.
+
+        This method iterates over all Subjects in the Cohort and yields tuples
+        of (subject.label, attribute_value) for each Subject. The attribute can
+        be nested, specified using dot notation
+        (e.g. "connectivity.functional.time_series").  If a Subject does not
+        have the attribute, the default value is yielded instead.
+
+        Args:
+            attr_name (str): The path to the attribute to collect.
+            default (Optional[T]): The default value to yield if the attribute
+                is not found. Defaults to None.
+
+        Yields:
+            Tuple[str, Union[T, Any]]: A (subject.label, attribute_value) pair
+                for each Subject.
+
+        Example:
+            >>> cohort = Cohort([
+            ...     Subject('Álvaro', demographics={'age': 30}),
+            ...     Subject('Beatriz', demographics={'age': 12})
+            ... ])
+            >>> dict(cohort.collect("demographics"))
+            {'Alice': {'age': 30}, 'Bob': {'age': 12}}
+            >>> list(cohort.collect("EEG", default=0))
+            [('Alice', 0), ('Bob', 0)]
+        """
+        for subject in self:
+            try:
+                # Traverse the nested attribute path
+                value = subject
+                for attr in attr_name.split('.'):
+                    value = gettattr(value, attr)
+                yield (subject.label, value)
+            except AttributeError:
+                yield (subject.label, default)
+
+    def filter(self, condition: Callable[[SubjectT], bool]) -> 'Cohort':
+        """Create Cohort subset with Subjects that satisfy a condition.
+
+        This method applies a user-provided function (`condition`) to each
+        Subject in the Cohort. Only Subjects for which the function returns
+        `True` are included in the new Cohort.
+
+        Args:
+            condition (Callable[[SubjectT], bool]): A function that takes a
+                Subject and returns a boolean.
+
+        Returns:
+            Cohort: A new Cohort containing only satisfactory Subjects.
+
+        Example:
+            >>> cohort = Cohort([
+            ...     Subject('Álvaro', demographics={'age': 30}),
+            ...     Subject('Beatriz', demographics={'age': 12})
+            ... ])
+            >>> def is_adult(subject):
+            ...     return subject.demographics['age'] >= 18
+            >>> adult_cohort = cohort.filter(is_adult)
+            >>> len(adult_cohort)
+            1
+        """
         subcohort = filter(condition, self)
         return type(self)(subcohort)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: str) -> 'Subject':
         for subject in self:
             if subject.label == index:
                 return subject
