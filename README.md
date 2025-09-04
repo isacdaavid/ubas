@@ -12,7 +12,7 @@
 
 # schiz_wholebrain
 
-> A library to bride the gap between BIDS connectivity data and
+> A library to bridge the gap between BIDS connectivity data and
 > whole-brain simulation.
 
 in progress...
@@ -36,10 +36,10 @@ conda activate myenv
 Make sure to install the dependencies listed in [setup.cfg](https://github.com/isacdaavid/schiz_wholebrain/blob/master/setup.cfg#L50). For instance:
 
 ```{shell}
-pip install numpy pybids scipy tqdm
+pip install numpy pybids scipy tqdm neurolib
 ```
 
-If you wish to run the accompanying Jupyter notebook:
+If you wish to run the accompanying Jupyter [notebook](https://github.com/isacdaavid/schiz_wholebrain/blob/master/notebook.ipynb):
 ```{shell}
-pip install notebook matplotlib
+pip install notebook matplotlib 
 ```

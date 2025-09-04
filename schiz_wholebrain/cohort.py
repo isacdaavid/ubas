@@ -3,6 +3,8 @@ Class to represent a Cohort of Subjects.
 """
 
 import concurrent.futures
+import os
+import re
 from typing import (
     Any,
     Callable,
@@ -31,7 +33,7 @@ from .subject import Subject
 
 
 class Cohort(set):
-    """A specialized set to manage a cohort of Subjects in a study.
+    """A specialized class to manage a cohort of Subjects in a study.
 
     Attributes:
         labels: (Set[str]): The labels of all Subjects contained in this Cohort.
@@ -41,7 +43,8 @@ class Cohort(set):
         """Initialize a Cohort with an iterable of Subject objects.
 
         Args:
-            subjects (Iterable[SubjectT]): Subject objects to include.
+            subjects (Iterable[SubjectT]):
+                Subject objects to include.
 
         Example:
             >>> subjects = [Subject('Álvaro'), Subject('Beatriz')]
@@ -70,10 +73,12 @@ class Cohort(set):
         """Overloaded add() which also updates the Subject cache.
 
         Args:
-            subject (SubjectT): The Subject to be added to this Cohort.
+            subject (SubjectT):
+                The Subject to be added to this Cohort.
 
         Returns:
-            None: Calling Cohort is extended or overwritten as side effect.
+            None:
+                The calling Cohort is extended or overwritten as side effect.
 
         Example:
             >>> subjects = [Subject('Álvaro'), Subject('Beatriz')]
@@ -84,6 +89,7 @@ class Cohort(set):
             >>> print(len(cohort))
             2
         """
+        # TODO: atomic thread-safety
         super().add(subject)
         self._label_to_subject[subject.label] = subject
 
@@ -91,13 +97,16 @@ class Cohort(set):
         """Overloaded remove() which also updates the Subject cache.
 
         Args:
-            subject (SubjectT): The Subject to be removed from this Cohort.
+            subject (SubjectT):
+                The Subject to be removed from this Cohort.
 
         Returns:
-            None: Calling Cohort might be shrunk as side effect.
+            None:
+                The calling Cohort might be shrunk as side effect.
 
         Raises:
-            KeyError: If the Subject to remove is not found.
+            KeyError:
+                If the Subject to remove is not found.
 
         Example:
             >>> subjects = [Subject('Álvaro'), Subject('Beatriz')]
@@ -108,6 +117,7 @@ class Cohort(set):
             >>> print(len(cohort))
             1
         """
+        # TODO: atomic thread-safety
         super().remove(subject)
         del self._label_to_subject[subject.label]
 
@@ -115,13 +125,16 @@ class Cohort(set):
         """Retrieve a Subject from the Cohort by its label in O(1) time.
 
         Args:
-            index (str): The label of Subject to be retrieved.
+            index (str):
+                The label of Subject to be retrieved.
 
         Returns:
-            SubjectT: The Subject for the specified label.
+            SubjectT:
+                The Subject for the specified label.
 
         Raises:
-            KeyError: If the Subject to retrieve is not found.
+            KeyError:
+                If the Subject to retrieve is not found.
 
         Example:
             >>> subjects = [Subject('Álvaro'), Subject('Beatriz')]
@@ -139,11 +152,12 @@ class Cohort(set):
         """Check if a Subject or a subject label exists in the Cohort.
 
         Args:
-            item (Union[str, SubjectT]): Subject or label whose membership will
-                be checked.
+            item (Union[str, SubjectT]):
+                Subject or label whose membership will be checked.
 
         Returns:
-            bool: Whether the Subject or subject labels is part of this Cohort.
+            bool:
+                Whether the Subject or subject label is part of this Cohort.
 
         Example:
             >>> subjects = [Subject('Álvaro'), Subject('Beatriz')]
@@ -166,6 +180,7 @@ class Cohort(set):
             structural_derivatives: BIDSLayout,
             functional_derivatives: BIDSLayout,
             atlases: Iterable = ['4S156', '4S256', '4S456'],
+            sample_size: Optional[int] = None,
     ) -> 'Cohort':
         """Constructs a pre-filled Cohort instance from data.
 
@@ -176,17 +191,20 @@ class Cohort(set):
         processing is used to load connectivity data.
 
         Args:
-            demographics_file (str): Path to the MATLAB (.mat) file containing
-                demographics data. The file must contain an 'alldata' key with a
-                matrix value, where the first column represents subject labels.
-            structural_derivatives (BIDSLayout): Object pointing to the
-                directory containing tractography derivatives from QSIrecon.
-            functional_derivatives (BIDSLayout): Object pointing to the
-                directory containing functional derivatives from XCP-D.
-            atlases (Iterable[str]): Atlas names to load from connectivity data.
+            demographics_file (str):
+                Path to the MATLAB (.mat) file containing demographics data.
+            structural_derivatives (BIDSLayout):
+                Object pointing to the tractography derivatives from QSIrecon.
+            functional_derivatives (BIDSLayout):
+                Object pointing to the functional derivatives from XCP-D.
+            atlases (Iterable[str]):
+                Atlas names to load from connectivity data.
+            sample_size (Optional[int]):
+                Limit Cohort size to at most this many Subjects.
 
         Returns:
-            Cohort: A Cohort instance containing Subject objects.
+            Cohort:
+                A Cohort instance containing Subject objects.
         """
         all_demographics = cls._load_demographics_file(demographics_file)
         all_subject_labels = set(all_demographics[:, 0].tolist())
@@ -201,6 +219,11 @@ class Cohort(set):
                 functional_subject_labels,
             )
         )
+
+        if sample_size is None:
+            sample_size = len(subject_labels)
+
+        subject_labels = subject_labels[:min(sample_size, len(subject_labels))]
 
         # Prepare generators with demographics and session data. We
         # rely on order of `subject_labels` to match them.
@@ -248,23 +271,32 @@ class Cohort(set):
 
         return cls(subjects)
 
+    # TODO: generality
     @classmethod
     def _load_demographics_file(cls, path: str) -> np.ndarray:
         """Load and clean demographics data from MATLAB file.
 
+        The file must contain an 'alldata' key with a matrix value, where the
+        first column represents subject labels.
+
         Args:
-            path (str): Path to the MATLAB (.mat) file containing demographics
-                data. The file must contain an 'alldata' key with a matrix
-                value, where the first column represents subject labels.
+            path (str):
+                Path to the MATLAB (.mat) file containing demographics data.
 
         Returns:
-            np.ndarray: A 2D NumPy array with the flattened demographics data
+            np.ndarray:
+                A 2D NumPy array with the flattened demographics data
 
         Raises:
-            FileNotFoundError: Exception is captured and error is printed.
-            KeyError: If the file dictionary is missing an 'alldata' field.
-            TypeError: If the array in the file contains unexpected elements.
-            ValueError: If the array in the file contains unexpected elements.
+            FileNotFoundError:
+                Exception is captured and error is printed.
+            KeyError:
+                If the file dictionary is missing an 'alldata' field.
+            TypeError:
+                If the array in the file contains unexpected elements.
+            ValueError:
+                If the array in the file contains unexpected elements.
+
         """
         try:
             all_data = load_matlab(path)
@@ -281,6 +313,7 @@ class Cohort(set):
 
         return clean_data
 
+    # TODO: generality
     @classmethod
     def _demographics_generator(
             cls,
@@ -297,12 +330,14 @@ class Cohort(set):
         disorder), plus a subdiagnosis category in case of 'SSD'.
 
         Args:
-            clean_data (np.ndarray): 2D array with clean demographics data.
-            subject_labels (Sequence[str]): The subjects for which to generate
-                demographics.
+            clean_data (np.ndarray):
+                2D array with clean demographics data.
+            subject_labels (Sequence[str]):
+                The subjects for which to generate demographics.
 
         Yields:
-            Generator[Dict[str, Any], None, None]: Dictionaries with demographics.
+            Generator[Dict[str, Any], None, None]:
+               A dictionary with the demographics of each Subject.
 
         Example:
             >>> clean_data = np.array([
@@ -333,48 +368,65 @@ class Cohort(set):
 
             yield subject_demographics
 
+    # TODO: parallelize?
     def collect(
         self,
         attr_name: str,
-        default: Optional[T] = None
-    ) -> Generator[Tuple[str, Union[T, Any]], None, None]:
+        default: Optional[T] = None,
+        subject_labels: Optional[bool] = False,
+    ) -> Generator[Union[Any, Tuple[str, Any]], None, None]:
         """Extracts a specific attribute from all Subjects in the Cohort.
 
-        This method iterates over all Subjects in the Cohort and yields tuples
-        of (subject.label, attribute_value) for each Subject. The attribute can
-        be nested, specified using dot notation
-        (e.g. "connectivity.functional.time_series").  If a Subject does not
+        This generator iterates over all Subjects in the Cohort and yields the
+        requested attribute value for each of them. Nested attributes can be
+        collected using dot notation (e.g. "connectivity.functional"), unquoted
+        dictionary keys (e.g. "quantities[fcs]") or both. If a Subject does not
         have the attribute, the default value is yielded instead.
 
         Args:
-            attr_name (str): The path to the attribute to collect.
-            default (Optional[T]): The default value to yield if the attribute
-                is not found. Defaults to None.
+            attr_name (str):
+                The path to the attribute or dictionary value to collect.
+            default (Optional[T]):
+                The default value to yield if the attribute is not found.
+            subject_labels (Optional[bool]):
+                Whether to yield `(subject.label, value)` tuples or just values.
 
         Yields:
-            Tuple[str, Union[T, Any]]: A (subject.label, attribute_value) pair
-                for each Subject.
+            Union[Any, Tuple[str, Any]]:
+                A `(subject.label, attribute_value)` pair for each Subject.
 
         Example:
             >>> cohort = Cohort([
             ...     Subject('Álvaro', demographics={'age': 30}),
             ...     Subject('Beatriz', demographics={'age': 12})
             ... ])
-            >>> dict(cohort.collect("demographics"))
-            {'Alice': {'age': 30}, 'Bob': {'age': 12}}
-            >>> list(cohort.collect("EEG", default=0))
-            [('Alice', 0), ('Bob', 0)]
+            >>> list(cohort.collect("demographics[age]"))
+            [30, 12]
+            >>> dict(cohort.collect("EEG", default=0, subject_labels=True))
+            {'Alice': 0, 'Bob': 0}
         """
+        # Split attr_name, handling both identifiers (left) and brackets (right).
+        regex = r"([a-zA-Z_]\w*)|\[([a-zA-Z_]\w*)\]"
+        parts = re.findall(regex, attr_name)
+        parts = [part[0] or [part[1]] for part in parts]
+
         for subject in self:
             try:
-                # Traverse the nested attribute path
                 value = subject
-                for attr in attr_name.split('.'):
-                    value = gettattr(value, attr)
-                yield (subject.label, value)
-            except AttributeError:
-                yield (subject.label, default)
+                for part in parts:
+                    if isinstance(part, list):
+                        # Dictionary key access
+                        value = value[part[0]]
+                    else:
+                        # Attribute access
+                        value = getattr(value, part)
 
+                yield (subject.label, value) if subject_labels else value
+
+            except (AttributeError, KeyError, TypeError):
+                yield (subject.label, default) if subject_labels else default
+
+    # TODO: parallelize?
     def filter(self, condition: Callable[[SubjectT], bool]) -> 'Cohort':
         """Create Cohort subset with Subjects who satisfy the condition.
 
@@ -383,11 +435,12 @@ class Cohort(set):
         `True` are included in the new Cohort.
 
         Args:
-            condition (Callable[[SubjectT], bool]): A function that takes a
-                Subject and returns a boolean.
+            condition (Callable[[SubjectT], bool]):
+                A function that takes a Subject and returns a boolean.
 
         Returns:
-            Cohort: A new Cohort containing only satisfactory Subjects.
+            Cohort:
+                A new Cohort containing only satisfactory Subjects.
 
         Example:
             >>> cohort = Cohort([
@@ -402,3 +455,59 @@ class Cohort(set):
         """
         subcohort = filter(condition, self)
         return type(self)(subcohort)
+
+    def compute(
+            self,
+            quantity: Callable[[SubjectT], Any],
+            key: Optional[str] = None,
+            max_workers: Optional[int] = None,
+    ) -> None:
+        """Apply a function to each Subject in parallel and store the result.
+
+        This method applies a user-provided function (quantity) to each Subject
+        in the Cohort and stores the result in the Subject's `quantities`
+        dictionary. If no key is provided, the function's name is used as key.
+
+        Args:
+            quantity (Callable[[SubjectT], Any]):
+                A function that takes a Subject and returns a computed value.
+            key (Optional[str]):
+                Override key name under which quantity will be stored.
+            max_workers (Optional[int]):
+                Maximum number of processes to spawn in parallel.
+
+        Returns:
+            None:
+                Results are stored in Subject.quantities['quantity'].
+
+        Example:
+            >>> from math import floor
+            >>> cohort = Cohort([Subject('Álvaro', demographics={'age': 30}),
+            ...                   Subject('Beatriz', demographics={'age': 12})])
+            >>> def decades(subject):
+            ...     return floor(subject.demographics['age'] / 10)
+            >>> cohort.compute(decades)
+            >>> print(cohort['Beatriz'].quantities['decades'])
+            1
+        """
+        if key is None:
+            key = quantity.__name__
+
+        if max_workers is None:
+            max_workers = os.cpu_count()
+
+        # Submit task for each Subject in parallel.
+        with concurrent.futures.ProcessPoolExecutor(
+                max_workers=max_workers
+        ) as executor:
+            futures_to_subjects = {
+                executor.submit(quantity, subject): subject
+                for subject in self
+            }
+
+            for future in tqdm(
+                    concurrent.futures.as_completed(futures_to_subjects),
+                    total=len(futures_to_subjects),
+            ):
+                subject = futures_to_subjects[future]
+                subject.quantities[key] = future.result()

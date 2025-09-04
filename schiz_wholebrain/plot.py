@@ -9,7 +9,19 @@ def jitter(positions, amount = 0.1):
     offsets = np.random.uniform(-amount, amount, size=len(positions))
     return np.array(positions) + offsets
 
-def scatter(controls, patients, ylabel="", xlabel=""):
+def bars(controls, patients, xlabel="", ylabel=""):
+    plt.figure()
+    label_c = "SC vs empirical FC"
+    plt.bar(0, controls.mean(), yerr=controls.std(), label=label_c)
+    label_p = "Simulated FC vs empirical FC"
+    plt.bar(1, patients.mean(), yerr=patients.std(), label=label_p)
+    plt.xticks([1, 2], ['', ''], fontsize=14)
+    plt.xlabel(xlabel, fontsize=14)
+    plt.ylabel(ylabel, fontsize=14)
+    plt.legend()
+    plt.show()
+
+def scatter(controls, patients, xlabel="", ylabel=""):
     plt.figure()
     x = jitter([1] * len(controls))
     plt.plot(x, controls, 'o', color='blue')
@@ -22,7 +34,7 @@ def scatter(controls, patients, ylabel="", xlabel=""):
     plt.xlim(0.5, 2.5)
     plt.show()
 
-def density(controls, patients, ylabel="", xlabel=""):
+def density(controls, patients, xlabel="", ylabel=""):
     plt.figure()
     plt.hist(controls, alpha=0.5, bins=40, color='blue', label='HC')
     plt.hist(patients, alpha=0.5, bins=40, color='orange', label='SSD')
