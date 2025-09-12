@@ -111,6 +111,7 @@ class Subject:
             self,
             quantity: Callable[[SubjectT], Any],
             key: Optional[str] = None,
+            **kwargs: Mapping[str, Any],
     ) -> None:
         """Compute a quantity for this Subject and store the result.
 
@@ -123,6 +124,8 @@ class Subject:
                 A function that takes a Subject and returns a computed value.
             key (Optional[str]):
                 Override key name under which quantity will be stored.
+            kwargs (Mapping[str, Any]):
+                Variable named arguments passed as `quantity(subject, **kwargs)`
 
         Example:
         >>> from math import floor
@@ -136,7 +139,7 @@ class Subject:
         if key is None:
             key = quantity.__name__
 
-        self.quantities[key] = quantity(self)
+        self.quantities[key] = quantity(self, **kwargs)
 
     def __repr__(self):
         return f"Subject({self.label}, {self.demographics['diagnosis']})"

@@ -41,5 +41,5 @@ pip install numpy pybids scipy tqdm neurolib
 
 If you wish to run the accompanying Jupyter [notebook](https://github.com/isacdaavid/schiz_wholebrain/blob/master/notebook.ipynb):
 ```{shell}
-pip install notebook matplotlib 
+pip install notebook matplotlib importlib
 ```

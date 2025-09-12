@@ -11,6 +11,7 @@ from typing import (
     Dict,
     Generator,
     Iterable,
+    Mapping,
     Optional,
     Sequence,
     Set,
@@ -393,7 +394,7 @@ class Cohort(set):
 
         Yields:
             Union[Any, Tuple[str, Any]]:
-                A `(subject.label, attribute_value)` pair for each Subject.
+                The value of the attribute for each Subject.
 
         Example:
             >>> cohort = Cohort([
@@ -461,6 +462,7 @@ class Cohort(set):
             quantity: Callable[[SubjectT], Any],
             key: Optional[str] = None,
             max_workers: Optional[int] = None,
+            **kwargs: Mapping[str, Any],
     ) -> None:
         """Apply a function to each Subject in parallel and store the result.
 
@@ -475,6 +477,8 @@ class Cohort(set):
                 Override key name under which quantity will be stored.
             max_workers (Optional[int]):
                 Maximum number of processes to spawn in parallel.
+            kwargs (Mapping[str, Any]):
+                Variable named arguments passed as `quantity(subject, **kwargs)`
 
         Returns:
             None:
@@ -494,14 +498,14 @@ class Cohort(set):
             key = quantity.__name__
 
         if max_workers is None:
-            max_workers = os.cpu_count()
+            max_workers = max(1, os.cpu_count() - 2)
 
         # Submit task for each Subject in parallel.
         with concurrent.futures.ProcessPoolExecutor(
                 max_workers=max_workers
         ) as executor:
             futures_to_subjects = {
-                executor.submit(quantity, subject): subject
+                executor.submit(quantity, subject, **kwargs): subject
                 for subject in self
             }
 
