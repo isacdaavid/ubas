@@ -25,7 +25,7 @@ class Connectivity():
                 )
             )
 
-        if matrix.shape[0] != matrix.shape[1] or len(matrix.shape) != 2:
+        if matrix.shape[0] != matrix.shape[1] or matrix.ndim != 2:
             raise ValueError(
                 'Cannot normalize non-square {}.'.format(
                     connectivity_matrix,

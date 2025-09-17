@@ -2,7 +2,7 @@
 Functions to compute measurements of interest on `Subject` data.
 """
 
-from typing import TypeVar
+from typing import Optional, TypeVar
 
 SubjectT = TypeVar('SubjectT', bound='Subject')
 
@@ -18,20 +18,82 @@ ATLAS = '4S156'
 CORTEX = slice(0, 100)
 
 def structure_function_correlation(subject: SubjectT) -> float:
+    """
+    Pearson correlation between structural and functional connectivity matrices.
+
+    Args:
+        subject (SubjectT):
+            Subject with structural and functional connectivity matrices.
+
+    Returns:
+        float:
+            Pearson correlation.
+    """
     structural = subject.structural_connectivity[ATLAS].normalize('raw_count')
     structural_cortex = structural[CORTEX, CORTEX].ravel()
     functional = subject.functional_connectivity[ATLAS].correlation_matrix
     functional_cortex = functional[CORTEX, CORTEX].ravel()
     return float(np.corrcoef(structural_cortex, functional_cortex)[0, 1])
 
-def aln_correlation(subject: SubjectT, mean_structural=False) -> float:
-    # Adaptive linear-nonlinear model of exponential integrate-and-fire neurons
+def aln_functional_connectivity(
+        subject: SubjectT,
+        transient: Optional[int]=0,
+) -> np.ndarray:
+    """Obtain functional connectivity matrix from BOLD simulation in ALN model.
+
+    Args:
+        subject (SubjectT):
+            Subject containing ALN model results.
+        transient (Optional[int]):
+            Duration of transient dynamics to be discard from data, in seconds.
+
+    Returns:
+        np.ndarray:
+            Pearson correlation matrix.
+    """
+    time_series = subject.quantities['aln_model'].BOLD.BOLD[:, transient:]
+    # time_series = bandpass_filter(time_series, 0.5, 0.01, 0.1)
+    return np.corrcoef(time_series)
+
+
+def aln_model(
+        subject: SubjectT,
+        mean_structural: Optional[bool]=False,
+        duration: Optional[int]=300,
+) -> ALNModel:
+    """Simulation of Adaptive Linear-Nonlinear neural mass model.
+
+    The model simulates cortical dynamics using structural
+    connectivity and distance matrices (in mm) to add propagation
+    delays, either from subject data or pre-computed cohort-averaged
+    values. Node dynamics are taken from a neural-mass reduction of
+    excitatory and inhibitory populations with exponential
+    integrate-and-fire neurons.
+
+    Args:
+        subject (SubjectT):
+            Subject containing structural connectivity data.
+        mean_structural (Optional[bool]):
+            If True, uses cohort-averaged structural connectivity.
+        duration (Optional[int]):
+            The duration of the simulation, in seconds.
+
+    Returns:
+        ALNModel:
+            An initialized and executed ALN model with simulation results.
+    """
     if mean_structural:
         structural = subject.quantities['cohort_mean_raw_count']
         distances =  subject.quantities['cohort_mean_mean_length']
     else:
         structural = subject.structural_connectivity[ATLAS].normalize('raw_count')
-        distances = subject.structural_connectivity[ATLAS].normalize('mean_length')
+        # Don't normalize distances, only average with transpose to
+        # make symmetrical. Some model parameters are distance-sensitive.
+        distances = subject.structural_connectivity[ATLAS].mean_length
+        distances = (distances + distances.T) / 2
+
+    # structural[structural < 0.5] = 0
+    # distances[structural == 0] = 0
 
     structural_cortex = structural[CORTEX, CORTEX]
     distances_cortex = distances[CORTEX, CORTEX]
@@ -39,7 +101,7 @@ def aln_correlation(subject: SubjectT, mean_structural=False) -> float:
     model = ALNModel(Cmat = structural_cortex, Dmat = distances_cortex)
     # Default values between brackets.
     parameters = {
-        'duration': 5 * 60 * 1000, # 5 min x 60 s x 1000 ms.
+        'duration': duration * 1000, # 5 min x 60 s x 1000 ms.
         # Global constants.
         'signalV': 20, # [20 m/s] global signal speed.
         'c_gl': 0.3,   # [0.3] global current?
@@ -62,7 +124,7 @@ def aln_correlation(subject: SubjectT, mean_structural=False) -> float:
         'tau_se': 2.0, # [2.0 ms] E synapse time constant.
         'tau_si': 5.0, # [5.0 ms] I synapse time constant.
         'tau_de': 1.0, # [1.0 ms] delay to E time constant?
-        'tau_di': 1.0, # [1.0 ms] delay to E time constant?
+        'tau_di': 1.0, # [1.0 ms] delay to I time constant?
         # Maximum post-synaptic currents.
         'cee': 0.3,   # [0.3 mV/ms] AMPA E to E.
         'cie': 0.3,   # [0.3 mV/ms] AMPA E to I.
@@ -87,20 +149,14 @@ def aln_correlation(subject: SubjectT, mean_structural=False) -> float:
         'Vr': -70,     # [-70 mV] rate threshold voltage.
         'Vs': -40,     # [-40 mV] spike threshold voltage.
         'Tref': 1.5,   # [1.5 ms] refractory period.
-        # Ornstein-Uhlenbeck (brownian walk + mean drift + mean reversion).
-        'tau_ou': 5.0,             # [5.0 ms]
+        # Ornstein-Uhlenbeck noise (brownian walk + mean drift + mean reversion).
+        'tau_ou': 5.0,            # [5.0 ms]
         'sigma_ou': 0.19,         # [0] std. dev.
     }
+
     model.params.update(parameters)
     model.run(chunkwise=True, chunksize=60000, bold=True)
-
-    transient = 12              # seconds
-    simulated = neurolib.utils.functions.fc(model.BOLD.BOLD[:, transient:])
-    simulated = simulated.ravel()
-    empirical = subject.functional_connectivity[ATLAS].correlation_matrix
-    empirical_cortex = empirical[CORTEX, CORTEX].ravel()
-
-    return float(np.corrcoef(simulated, empirical_cortex)[0, 1])
+    return model
 
 def fcs(subject: SubjectT, absolute=True) -> np.ndarray[float]:
     correlation = subject.functional_connectivity[ATLAS].correlation_matrix
@@ -111,3 +167,39 @@ def fcs(subject: SubjectT, absolute=True) -> np.ndarray[float]:
     fisher = np.arctanh(fcs)
     zscores = (fisher - fisher.mean()) / fisher.std()
     return zscores
+
+def bandpass_filter(
+    data: np.ndarray,
+    sampling_rate: float,
+    low_freq: float,
+    high_freq: float,
+) -> np.ndarray:
+    """
+    Apply a bandpass filter to each row of a time-series matrix.
+
+    Args:
+        data: 2D array of shape (n_signals, n_samples).
+        sampling_rate: Sampling frequency in Hz.
+        low_freq: Low cutoff frequency in Hz.
+        high_freq: High cutoff frequency in Hz.
+
+    Returns:
+        Filtered time-series in the time domain.
+    """
+    n_signals, n_samples = data.shape
+    filtered_data = np.zeros_like(data)
+
+    # Frequency axis
+    freqs = np.fft.fftfreq(n_samples, d=1/sampling_rate)
+
+    for i in range(n_signals):
+        # FFT of the signal
+        fft_signal = np.fft.fft(data[i])
+        # Create bandpass mask
+        mask = (np.abs(freqs) >= low_freq) & (np.abs(freqs) <= high_freq)
+        # Apply mask (zero out frequencies outside the band)
+        fft_filtered = fft_signal * mask
+        # Inverse FFT to return to time domain
+        filtered_data[i] = np.fft.ifft(fft_filtered).real
+
+    return filtered_data
