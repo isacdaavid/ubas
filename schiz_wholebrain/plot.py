@@ -3,12 +3,67 @@ Plotting functions
 """
 
 from collections import defaultdict
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Optional, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
 
 FONTSIZE = 14
+
+def connectivity(
+        matrix: np.array,
+        title: Optional[str]=None,
+        labels: Optional[Sequence[str]]=None
+) -> None:
+    """Visualize a connectivity matrix as a heatmap.
+
+    Args:
+        matrix (np.array):
+            numerical 2D numpy array to visualize.
+        title (Optional[str]):
+            Title for the plot.
+        labels (Optional[Sequence[str]]):
+            Labels for the x and y axes (brain regions).
+
+    Returns:
+        None.
+
+    Raises:
+        ValueError:
+            If matrix is not 2D and square. If labels don't match matrix size.
+        TypeError:
+            If matrix is not numerical.
+    """
+    if matrix.ndim != 2 or matrix.shape[0] != matrix.shape[1]:
+        raise ValueError("Input matrix must be 2D and square.")
+    if labels is not None and len(labels) != matrix.shape[0]:
+        raise ValueError("Wrong number of labels.")
+    if not np.issubdtype(matrix.dtype, np.number):
+        raise TypeError("Only numerical values are supported.")
+
+    fig, ax = plt.subplots()
+    im = ax.imshow(matrix)
+
+    if labels is not None:
+        ax.set_xticks(range(len(labels)))
+        ax.set_xticklabels(labels, rotation='vertical', fontsize=0.2 * FONTSIZE)
+        ax.set_yticks(range(len(labels)))
+        ax.set_yticklabels(labels, fontsize=0.2 * FONTSIZE)
+
+    plt.colorbar(im, ax=ax)
+    ax.set_title(title, fontsize=FONTSIZE)
+    plt.tight_layout()
+    plt.show()
+
+def density(controls, patients, xlabel="", ylabel=""):
+    plt.figure()
+    plt.hist(controls, alpha=0.5, bins=40, color='blue', label='HC')
+    plt.hist(patients, alpha=0.5, bins=40, color='orange', label='SSD')
+    plt.xlabel(xlabel, fontsize=FONTSIZE)
+    plt.ylabel(ylabel, fontsize=FONTSIZE)
+    plt.yticks(fontsize=FONTSIZE)
+    plt.legend()
+    plt.show()
 
 def jitter(positions: Sequence[float], amount: float=0.1) -> np.array:
     """Offset numerical positions by some random amount."""
@@ -69,16 +124,6 @@ def scatter(controls, patients, xlabel="", ylabel=""):
     plt.xticks([1, 2], ["HC", "SSD"], fontsize=FONTSIZE)
     plt.yticks(fontsize=FONTSIZE)
     plt.xlim(0.5, 2.5)
-    plt.show()
-
-def density(controls, patients, xlabel="", ylabel=""):
-    plt.figure()
-    plt.hist(controls, alpha=0.5, bins=40, color='blue', label='HC')
-    plt.hist(patients, alpha=0.5, bins=40, color='orange', label='SSD')
-    plt.xlabel(xlabel, fontsize=FONTSIZE)
-    plt.ylabel(ylabel, fontsize=FONTSIZE)
-    plt.yticks(fontsize=FONTSIZE)
-    plt.legend()
     plt.show()
 
 def spectrum(controls, patients, xlim, xlabel="", ylabel="Power"):
