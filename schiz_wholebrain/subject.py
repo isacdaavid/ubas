@@ -2,11 +2,14 @@
 Class to represent individual participants.
 """
 
+import re
 from types import SimpleNamespace
-from typing import Any, Callable, Iterable, Mapping, Optional, TypeVar
+from typing import Any, Callable, Iterable, Mapping, Optional, TypeVar, Union
 
 # Type variable for Subject or its subclasses
 SubjectT = TypeVar('SubjectT', bound='Subject')
+# Generic type for the attribute value
+T = TypeVar('T')
 
 import numpy as np
 
@@ -107,12 +110,62 @@ class Subject:
             for atlas in atlases
         }
 
+    def collect(
+        self,
+        attr_name: str,
+        default: Optional[T] = None,
+    ) -> Any:
+        """Extracts a specific attribute from Subject.
+
+        Return requested attribute value. Nested attributes can be collected
+        using dot notation (e.g. "connectivity.functional"), unquoted dictionary
+        keys (e.g. "quantities[fcs]") or both. If a Subject does not have the
+        attribute, the default value is returned instead.
+
+        Args:
+            attr_name (str):
+                The path to the attribute or dictionary value to collect.
+            default (Optional[T]):
+                The default value to return if the attribute is not found.
+
+        Returns:
+            Any:
+                The value of the attribute.
+
+        Example:
+            >>> sub = Subject('Álvaro', demographics={'age': 30})
+            >>> sub.collect("demographics[age]")
+            30
+            >>> sub.collect("EEG", default=0)
+            0
+        """
+        # Split attr_name, handling both identifiers (left) and brackets (right).
+        regex = r"([a-zA-Z_]\w*)|\[([a-zA-Z_]\w*)\]"
+        parts = re.findall(regex, attr_name)
+        parts = [part[0] or [part[1]] for part in parts]
+
+        try:
+            value = self
+            for part in parts:
+                if isinstance(part, list):
+                    # Dictionary key access
+                    value = value[part[0]]
+                else:
+                    # Attribute access
+                    value = getattr(value, part)
+
+            return value
+
+        except (AttributeError, KeyError, TypeError):
+            return default
+
     def compute(
             self,
             quantity: Callable[[SubjectT], Any],
             key: Optional[str] = None,
+            output: Optional[bool] = False,
             **kwargs: Mapping[str, Any],
-    ) -> None:
+    ) -> Union[None, Any]:
         """Compute a quantity for this Subject and store the result.
 
         This method applies a user-provided function (quantity) to the Subject
@@ -124,6 +177,8 @@ class Subject:
                 A function that takes a Subject and returns a computed value.
             key (Optional[str]):
                 Override key name under which quantity will be stored.
+            output (Optional[bool]):
+                Whether to return result instead of storing it.
             kwargs (Mapping[str, Any]):
                 Variable named arguments passed as `quantity(subject, **kwargs)`
 
@@ -139,7 +194,12 @@ class Subject:
         if key is None:
             key = quantity.__name__
 
-        self.quantities[key] = quantity(self, **kwargs)
+        result = quantity(self, **kwargs)
+
+        if output:
+            return result
+
+        self.quantities[key] = result
 
     def __repr__(self):
         return f"Subject({self.label}, {self.demographics['diagnosis']})"

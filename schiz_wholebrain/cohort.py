@@ -4,7 +4,6 @@ Class to represent a Cohort of Subjects.
 
 import concurrent.futures
 import os
-import re
 from typing import (
     Any,
     Callable,
@@ -370,6 +369,7 @@ class Cohort(set):
             yield subject_demographics
 
     # TODO: parallelize?
+    # TODO: shortcircuit if some subject returns, e.g., None.
     def collect(
         self,
         attr_name: str,
@@ -406,26 +406,9 @@ class Cohort(set):
             >>> dict(cohort.collect("EEG", default=0, subject_labels=True))
             {'Alice': 0, 'Bob': 0}
         """
-        # Split attr_name, handling both identifiers (left) and brackets (right).
-        regex = r"([a-zA-Z_]\w*)|\[([a-zA-Z_]\w*)\]"
-        parts = re.findall(regex, attr_name)
-        parts = [part[0] or [part[1]] for part in parts]
-
         for subject in self:
-            try:
-                value = subject
-                for part in parts:
-                    if isinstance(part, list):
-                        # Dictionary key access
-                        value = value[part[0]]
-                    else:
-                        # Attribute access
-                        value = getattr(value, part)
-
-                yield (subject.label, value) if subject_labels else value
-
-            except (AttributeError, KeyError, TypeError):
-                yield (subject.label, default) if subject_labels else default
+            value = subject.collect(attr_name, default)
+            yield (subject.label, value) if subject_labels else value
 
     # TODO: parallelize?
     def filter(self, condition: Callable[[SubjectT], bool]) -> 'Cohort':
@@ -462,13 +445,17 @@ class Cohort(set):
             quantity: Callable[[SubjectT], Any],
             key: Optional[str] = None,
             max_workers: Optional[int] = None,
+            output: Optional[bool] = False,
+            subject_labels: Optional[bool] = False,
             **kwargs: Mapping[str, Any],
-    ) -> None:
+    ) -> Union[None, Union[Set[Any], ]]:
         """Apply a function to each Subject in parallel and store the result.
 
         This method applies a user-provided function (quantity) to each Subject
         in the Cohort and stores the result in the Subject's `quantities`
-        dictionary. If no key is provided, the function's name is used as key.
+        dictionary. If no `key` is provided, the function's name is used as
+        key. If `max_workers` is not provided, all CPU cores but 2 will be used
+        in parallel. If `output` is True, results will be returned 
 
         Args:
             quantity (Callable[[SubjectT], Any]):
@@ -477,6 +464,10 @@ class Cohort(set):
                 Override key name under which quantity will be stored.
             max_workers (Optional[int]):
                 Maximum number of processes to spawn in parallel.
+            output (Optional[bool]):
+                Whether to yield results instead of storing them.
+            subject_labels (Optional[bool]):
+                Whether to yield `(subject.label, value)` tuples or just values.
             kwargs (Mapping[str, Any]):
                 Variable named arguments passed as `quantity(subject, **kwargs)`
 
@@ -493,6 +484,7 @@ class Cohort(set):
             >>> cohort.compute(decades)
             >>> print(cohort['Beatriz'].quantities['decades'])
             1
+
         """
         if key is None:
             key = quantity.__name__
@@ -514,4 +506,9 @@ class Cohort(set):
                     total=len(futures_to_subjects),
             ):
                 subject = futures_to_subjects[future]
-                subject.quantities[key] = future.result()
+                result = future.result()
+
+                if output:
+                    return (subject.label, result) if subject_labels else result
+                else:
+                    subject.quantities[key] = result
