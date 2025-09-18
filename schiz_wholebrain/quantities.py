@@ -12,32 +12,44 @@ import numpy as np
 
 from .subject import Subject
 
+
 # TODO: don't hardcode parameters. Receive and unpack variable args.
 
 ATLAS = '4S156'
 CORTEX = slice(0, 100)
 
-def structure_function_correlation(subject: SubjectT) -> float:
+def matrix2matrix_correlation(
+        subject: SubjectT,
+        matrix1: str="",
+        matrix2: str="",
+) -> float:
     """
-    Pearson correlation between structural and functional connectivity matrices.
+    Pearson correlation between two connectivity matrices in a Subject.
 
     Args:
         subject (SubjectT):
             Subject with structural and functional connectivity matrices.
+        matrix1 (str):
+            Attribute path of first matrix to collect from this Subject.
+        matrix2 (str):
+            Attribute path of second matrix to collect from this Subject.
 
     Returns:
         float:
             Pearson correlation.
     """
-    structural = subject.structural_connectivity[ATLAS].normalize('raw_count')
-    structural_cortex = structural[CORTEX, CORTEX].ravel()
-    functional = subject.functional_connectivity[ATLAS].correlation_matrix
-    functional_cortex = functional[CORTEX, CORTEX].ravel()
-    return float(np.corrcoef(structural_cortex, functional_cortex)[0, 1])
+    matrix1 = subject.collect(matrix1)
+    matrix2 = subject.collect(matrix2)
+    matrix1_cortex = matrix1[CORTEX, CORTEX]
+    matrix2_cortex = matrix2[CORTEX, CORTEX]
+    correlation = np.corrcoef(matrix1_cortex.ravel(), matrix2_cortex.ravel())
+    return float(correlation[0, 1])
+
 
 def aln_functional_connectivity(
         subject: SubjectT,
         transient: Optional[int]=0,
+        model_key: Optional[str]='aln_model',
 ) -> np.ndarray:
     """Obtain functional connectivity matrix from BOLD simulation in ALN model.
 
@@ -51,7 +63,7 @@ def aln_functional_connectivity(
         np.ndarray:
             Pearson correlation matrix.
     """
-    time_series = subject.quantities['aln_model'].BOLD.BOLD[:, transient:]
+    time_series = subject.quantities[model_key].BOLD.BOLD[:, transient:]
     # time_series = bandpass_filter(time_series, 0.5, 0.01, 0.1)
     return np.corrcoef(time_series)
 
@@ -63,12 +75,11 @@ def aln_model(
 ) -> ALNModel:
     """Simulation of Adaptive Linear-Nonlinear neural mass model.
 
-    The model simulates cortical dynamics using structural
-    connectivity and distance matrices (in mm) to add propagation
-    delays, either from subject data or pre-computed cohort-averaged
-    values. Node dynamics are taken from a neural-mass reduction of
-    excitatory and inhibitory populations with exponential
-    integrate-and-fire neurons.
+    The model simulates cortical dynamics using structural connectivity and
+    distance matrices (in mm) to add propagation delays, either from subject
+    data or pre-computed cohort-averaged values. Node dynamics are taken from a
+    neural-mass reduction of excitatory and inhibitory populations with
+    exponential integrate-and-fire neurons.
 
     Args:
         subject (SubjectT):
@@ -81,6 +92,7 @@ def aln_model(
     Returns:
         ALNModel:
             An initialized and executed ALN model with simulation results.
+
     """
     if mean_structural:
         structural = subject.quantities['cohort_mean_raw_count']
@@ -92,8 +104,8 @@ def aln_model(
         distances = subject.structural_connectivity[ATLAS].mean_length
         distances = (distances + distances.T) / 2
 
-    # structural[structural < 0.5] = 0
-    # distances[structural == 0] = 0
+    structural[structural == 0] = structural[structural != 0].min()
+    distances[distances == 0] = distances.mean()
 
     structural_cortex = structural[CORTEX, CORTEX]
     distances_cortex = distances[CORTEX, CORTEX]
