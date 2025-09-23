@@ -2,9 +2,7 @@
 Functions to compute measurements of interest on `Subject` data.
 """
 
-from typing import Optional, TypeVar
-
-SubjectT = TypeVar('SubjectT', bound='Subject')
+from typing import Optional, Sequence, TypeVar
 
 from neurolib.models.aln import ALNModel
 import neurolib.utils.functions
@@ -12,16 +10,17 @@ import numpy as np
 
 from .subject import Subject
 
+SubjectT = TypeVar('SubjectT', bound=Subject)
 
 # TODO: don't hardcode parameters. Receive and unpack variable args.
-
 ATLAS = '4S156'
 CORTEX = slice(0, 100)
 
+
 def matrix2matrix_correlation(
         subject: SubjectT,
-        matrix1: str="",
-        matrix2: str="",
+        matrix1: str = "",
+        matrix2: str = "",
 ) -> float:
     """
     Pearson correlation between two connectivity matrices in a Subject.
@@ -48,30 +47,50 @@ def matrix2matrix_correlation(
 
 def aln_functional_connectivity(
         subject: SubjectT,
-        transient: Optional[int]=0,
-        model_key: Optional[str]='aln_model',
+        transient: int = 0,
+        model_key: str = 'aln_model',
+        bandpass: Optional[Sequence[float]] = None,
+        sampling_rate: Optional[float] = None,
 ) -> np.ndarray:
     """Obtain functional connectivity matrix from BOLD simulation in ALN model.
 
     Args:
         subject (SubjectT):
             Subject containing ALN model results.
-        transient (Optional[int]):
+        transient (int):
             Duration of transient dynamics to be discard from data, in seconds.
+        model_key (str):
+            Custom name under which the ALN model should be retrieved.
+        bandpass (Optional[Sequence[float]]):
+            Filter frequency content of BOLD time series to (min Hz, max Hz).
+        sampling_rate (Optional[float]):
+            Sampling frequency in Hz.
 
     Returns:
         np.ndarray:
             Pearson correlation matrix.
     """
-    time_series = subject.quantities[model_key].BOLD.BOLD[:, transient:]
-    # time_series = bandpass_filter(time_series, 0.5, 0.01, 0.1)
+    time_series = subject.quantities[model_key].BOLD.BOLD
+
+    if transient < 0 or transient >= time_series.shape[1]:
+        raise ValueError(
+            f"transient must be between 0 and {time_series.shape[1] - 1}."
+        )
+
+    time_series = time_series[:, transient:]
+
+    if bandpass is not None and sampling_rate is not None:
+        time_series = bandpass_filter(
+            time_series, sampling_rate, bandpass[0], bandpass[1]
+        )
+
     return np.corrcoef(time_series)
 
 
 def aln_model(
         subject: SubjectT,
-        mean_structural: Optional[bool]=False,
-        duration: Optional[int]=300,
+        mean_structural: bool=False,
+        duration: int=300,
 ) -> ALNModel:
     """Simulation of Adaptive Linear-Nonlinear neural mass model.
 
@@ -84,15 +103,14 @@ def aln_model(
     Args:
         subject (SubjectT):
             Subject containing structural connectivity data.
-        mean_structural (Optional[bool]):
+        mean_structural (bool):
             If True, uses cohort-averaged structural connectivity.
-        duration (Optional[int]):
+        duration (int):
             The duration of the simulation, in seconds.
 
     Returns:
         ALNModel:
             An initialized and executed ALN model with simulation results.
-
     """
     if mean_structural:
         structural = subject.quantities['cohort_mean_raw_count']
@@ -103,9 +121,6 @@ def aln_model(
         # make symmetrical. Some model parameters are distance-sensitive.
         distances = subject.structural_connectivity[ATLAS].mean_length
         distances = (distances + distances.T) / 2
-
-    structural[structural == 0] = structural[structural != 0].min()
-    distances[distances == 0] = distances.mean()
 
     structural_cortex = structural[CORTEX, CORTEX]
     distances_cortex = distances[CORTEX, CORTEX]
@@ -170,7 +185,23 @@ def aln_model(
     model.run(chunkwise=True, chunksize=60000, bold=True)
     return model
 
-def fcs(subject: SubjectT, absolute=True) -> np.ndarray[float]:
+
+def connectivity_strength(subject: SubjectT, absolute=True) -> np.ndarray[float]:
+    """Connectivity Strength (Global Brain Connectivity) of connectivity matrix.
+
+    The connectivity strength of a node is defined as its average connectivity
+    with all other nodes.
+
+    Args:
+        subject (SubjectT):
+            Subject containing structural connectivity data.
+        absolute (bool):
+            Whether to return bare (absolute) strengths or normalize to z-scores.
+
+    Return:
+        np.array:
+            A 1-dimensional array with the connectivity strength of each node.
+    """
     correlation = subject.functional_connectivity[ATLAS].correlation_matrix
     correlation_cortex = correlation[CORTEX, CORTEX]
     fcs = correlation_cortex.mean(axis=0)
@@ -179,6 +210,7 @@ def fcs(subject: SubjectT, absolute=True) -> np.ndarray[float]:
     fisher = np.arctanh(fcs)
     zscores = (fisher - fisher.mean()) / fisher.std()
     return zscores
+
 
 def bandpass_filter(
     data: np.ndarray,
@@ -190,10 +222,14 @@ def bandpass_filter(
     Apply a bandpass filter to each row of a time-series matrix.
 
     Args:
-        data: 2D array of shape (n_signals, n_samples).
-        sampling_rate: Sampling frequency in Hz.
-        low_freq: Low cutoff frequency in Hz.
-        high_freq: High cutoff frequency in Hz.
+        data (np.ndarray):
+            2D array of shape (n_signals, n_samples).
+        sampling_rate (float):
+            Sampling frequency in Hz.
+        low_freq (float):
+            Low cutoff frequency in Hz.
+        high_freq (float):
+            High cutoff frequency in Hz.
 
     Returns:
         Filtered time-series in the time domain.
