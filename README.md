@@ -33,7 +33,7 @@ conda create --name myenv python=3.9
 conda activate myenv
 ```
 
-Make sure to install the dependencies listed in [setup.cfg](https://github.com/isacdaavid/schiz_wholebrain/blob/master/setup.cfg#L50). For instance:
+Make sure to install the dependencies listed in [setup.cfg](https://github.com/isacdaavid/schiz_wholebrain/blob/master/setup.cfg#L50):
 
 ```{shell}
 pip install numpy pybids scipy tqdm neurolib

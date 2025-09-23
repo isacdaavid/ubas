@@ -19,11 +19,6 @@ from typing import (
     Union,
 )
 
-# Type variable for Subject or its subclasses
-SubjectT = TypeVar('SubjectT', bound='Subject')
-# Generic type for the attribute value
-T = TypeVar('T')
-
 from bids import BIDSLayout
 import numpy as np
 from tqdm import tqdm
@@ -31,9 +26,13 @@ from tqdm import tqdm
 from .load import load_matlab
 from .subject import Subject
 
+# Type variable for Subject or its subclasses
+SubjectT = TypeVar('SubjectT', bound=Subject)
+# Generic type for the attribute value
+T = TypeVar('T')
 
 class Cohort(set):
-    """A specialized class to manage a cohort of Subjects in a study.
+    """A specialized set class to manage a cohort of Subjects in a study.
 
     Attributes:
         labels: (Set[str]): The labels of all Subjects contained in this Cohort.
@@ -404,7 +403,7 @@ class Cohort(set):
             >>> list(cohort.collect("demographics[age]"))
             [30, 12]
             >>> dict(cohort.collect("EEG", default=0, subject_labels=True))
-            {'Alice': 0, 'Bob': 0}
+            {'Álvaro': 0, 'Beatriz': 0}
         """
         for subject in self:
             value = subject.collect(attr_name, default)
@@ -443,48 +442,65 @@ class Cohort(set):
     def compute(
             self,
             quantity: Callable[[SubjectT], Any],
-            key: Optional[str] = None,
-            max_workers: Optional[int] = None,
             output: Optional[bool] = False,
+            key: Optional[str] = None,
             subject_labels: Optional[bool] = False,
+            max_workers: Optional[int] = None,
             **kwargs: Mapping[str, Any],
-    ) -> Union[None, Union[Set[Any], ]]:
-        """Apply a function to each Subject in parallel and store the result.
+    ) -> Union[None, Union[Set[Any], Dict[str, Any]]]:
+        """Apply a function to each Subject in parallel.
 
-        This method applies a user-provided function (quantity) to each Subject
-        in the Cohort and stores the result in the Subject's `quantities`
-        dictionary. If no `key` is provided, the function's name is used as
-        key. If `max_workers` is not provided, all CPU cores but 2 will be used
-        in parallel. If `output` is True, results will be returned 
+        This method applies a user-provided function (`quantity`) to each
+        Subject in the Cohort and stores the result in the Subject's
+        `quantities` dictionary. If `output` is True, results will be returned
+        instead of stored. If no `key` is provided, the function's name is used
+        as storage key. If `subject_labels` and `output` are True, the returned
+        data will be in dictionary format to keep track of subjects. If
+        `max_workers` is not provided, all CPU cores but 2 will be used in
+        parallel.
+
+        Any remaining keyword arguments will be passed as is to `quantity()`.
 
         Args:
             quantity (Callable[[SubjectT], Any]):
                 A function that takes a Subject and returns a computed value.
+            output (Optional[bool]):
+                Whether to return results instead of storing them.
             key (Optional[str]):
                 Override key name under which quantity will be stored.
+            subject_labels (Optional[bool]):
+                Whether to return `(subject.label, value)` tuples or just values.
             max_workers (Optional[int]):
                 Maximum number of processes to spawn in parallel.
-            output (Optional[bool]):
-                Whether to yield results instead of storing them.
-            subject_labels (Optional[bool]):
-                Whether to yield `(subject.label, value)` tuples or just values.
             kwargs (Mapping[str, Any]):
                 Variable named arguments passed as `quantity(subject, **kwargs)`
 
         Returns:
-            None:
-                Results are stored in Subject.quantities['quantity'].
+            Union[None, Union[Set[Any], Dict[str, Any]]]
+                None: Results are stored in Subject.quantities['quantity'].
+                Set[Any]: Returns a set with results.
+                Dict[str, Any]: Returns a dict indexed by subject labels.
 
         Example:
             >>> from math import floor
             >>> cohort = Cohort([Subject('Álvaro', demographics={'age': 30}),
             ...                   Subject('Beatriz', demographics={'age': 12})])
-            >>> def decades(subject):
-            ...     return floor(subject.demographics['age'] / 10)
+            >>> def decades(subject, round=False):
+            ...     if round:
+            ...         return floor(subject.demographics['age'] / 10)
+            ...     return subject.demographics['age'] / 10
             >>> cohort.compute(decades)
             >>> print(cohort['Beatriz'].quantities['decades'])
             1
-
+            >>> cohort.compute(decades, output=True) == {3, 1}
+            True
+            >>> cohort.compute(decades, output=True, subject_labels=True)
+            {'Álvaro': 3, 'Beatriz': 1}
+            >>> cohort.compute(decades, output=False, key='mykey')
+            >>> print(cohort['Beatriz'].quantities['mykey'])
+            1
+            >>> cohort.compute(decades, output=True, round=True)  == {3.0, 1.2}
+            True
         """
         if key is None:
             key = quantity.__name__
@@ -501,6 +517,7 @@ class Cohort(set):
                 for subject in self
             }
 
+            results = {}
             for future in tqdm(
                     concurrent.futures.as_completed(futures_to_subjects),
                     total=len(futures_to_subjects),
@@ -509,6 +526,13 @@ class Cohort(set):
                 result = future.result()
 
                 if output:
-                    return (subject.label, result) if subject_labels else result
+                    results.add(
+                        (subject.label, result) if subject_labels else result
+                    )
                 else:
                     subject.quantities[key] = result
+
+            if output:
+                if subject_labels:
+                    return dict(results)
+                return results

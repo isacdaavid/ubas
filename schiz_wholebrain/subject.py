@@ -6,15 +6,16 @@ import re
 from types import SimpleNamespace
 from typing import Any, Callable, Iterable, Mapping, Optional, TypeVar, Union
 
-# Type variable for Subject or its subclasses
-SubjectT = TypeVar('SubjectT', bound='Subject')
-# Generic type for the attribute value
-T = TypeVar('T')
-
 import numpy as np
 
 from .connectivity import FunctionalConnectivity, StructuralConnectivity
 from .load import load_matlab, load_tsv
+
+# Type variable for Subject or its subclasses
+SubjectT = TypeVar('SubjectT', bound=Subject)
+# Generic type for the attribute value
+T = TypeVar('T')
+
 
 class Subject:
     def __init__(
