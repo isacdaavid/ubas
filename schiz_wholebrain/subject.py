@@ -12,7 +12,7 @@ from .connectivity import FunctionalConnectivity, StructuralConnectivity
 from .load import load_matlab, load_tsv
 
 # Type variable for Subject or its subclasses
-SubjectT = TypeVar('SubjectT', bound=Subject)
+SubjectT = TypeVar('SubjectT', bound='Subject')
 # Generic type for the attribute value
 T = TypeVar('T')
 

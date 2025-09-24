@@ -17,41 +17,13 @@ ATLAS = '4S156'
 CORTEX = slice(0, 100)
 
 
-def matrix2matrix_correlation(
-        subject: SubjectT,
-        matrix1: str = "",
-        matrix2: str = "",
-) -> float:
-    """
-    Pearson correlation between two connectivity matrices in a Subject.
-
-    Args:
-        subject (SubjectT):
-            Subject with structural and functional connectivity matrices.
-        matrix1 (str):
-            Attribute path of first matrix to collect from this Subject.
-        matrix2 (str):
-            Attribute path of second matrix to collect from this Subject.
-
-    Returns:
-        float:
-            Pearson correlation.
-    """
-    matrix1 = subject.collect(matrix1)
-    matrix2 = subject.collect(matrix2)
-    matrix1_cortex = matrix1[CORTEX, CORTEX]
-    matrix2_cortex = matrix2[CORTEX, CORTEX]
-    correlation = np.corrcoef(matrix1_cortex.ravel(), matrix2_cortex.ravel())
-    return float(correlation[0, 1])
-
-
 def aln_functional_connectivity(
         subject: SubjectT,
         transient: int = 0,
         model_key: str = 'aln_model',
         bandpass: Optional[Sequence[float]] = None,
         sampling_rate: Optional[float] = None,
-) -> np.ndarray:
+) -> np.ndarray[float]:
     """Obtain functional connectivity matrix from BOLD simulation in ALN model.
 
     Args:
@@ -186,38 +158,12 @@ def aln_model(
     return model
 
 
-def connectivity_strength(subject: SubjectT, absolute=True) -> np.ndarray[float]:
-    """Connectivity Strength (Global Brain Connectivity) of connectivity matrix.
-
-    The connectivity strength of a node is defined as its average connectivity
-    with all other nodes.
-
-    Args:
-        subject (SubjectT):
-            Subject containing structural connectivity data.
-        absolute (bool):
-            Whether to return bare (absolute) strengths or normalize to z-scores.
-
-    Return:
-        np.array:
-            A 1-dimensional array with the connectivity strength of each node.
-    """
-    correlation = subject.functional_connectivity[ATLAS].correlation_matrix
-    correlation_cortex = correlation[CORTEX, CORTEX]
-    fcs = correlation_cortex.mean(axis=0)
-    if absolute:
-        return fcs
-    fisher = np.arctanh(fcs)
-    zscores = (fisher - fisher.mean()) / fisher.std()
-    return zscores
-
-
 def bandpass_filter(
     data: np.ndarray,
     sampling_rate: float,
     low_freq: float,
     high_freq: float,
-) -> np.ndarray:
+) -> np.ndarray[float]:
     """
     Apply a bandpass filter to each row of a time-series matrix.
 
@@ -251,3 +197,57 @@ def bandpass_filter(
         filtered_data[i] = np.fft.ifft(fft_filtered).real
 
     return filtered_data
+
+
+def connectivity_strength(subject: SubjectT, absolute=True) -> np.ndarray[float]:
+    """Connectivity Strength (Global Brain Connectivity) of connectivity matrix.
+
+    The connectivity strength of a node is defined as its average connectivity
+    with all other nodes.
+
+    Args:
+        subject (SubjectT):
+            Subject containing structural connectivity data.
+        absolute (bool):
+            Whether to return bare (absolute) strengths or normalize to z-scores.
+
+    Return:
+        np.array:
+            A 1-dimensional array with the connectivity strength of each node.
+    """
+    correlation = subject.functional_connectivity[ATLAS].correlation_matrix
+    correlation_cortex = correlation[CORTEX, CORTEX]
+    fcs = correlation_cortex.mean(axis=0)
+    if absolute:
+        return fcs
+    fisher = np.arctanh(fcs)
+    zscores = (fisher - fisher.mean()) / fisher.std()
+    return zscores
+
+
+def matrix2matrix_correlation(
+        subject: SubjectT,
+        matrix1: str = "",
+        matrix2: str = "",
+) -> float:
+    """
+    Pearson correlation between two connectivity matrices in a Subject.
+
+    Args:
+        subject (SubjectT):
+            Subject with structural and functional connectivity matrices.
+        matrix1 (str):
+            Attribute path of first matrix to collect from this Subject.
+        matrix2 (str):
+            Attribute path of second matrix to collect from this Subject.
+
+    Returns:
+        float:
+            Pearson correlation.
+    """
+    matrix1 = subject.collect(matrix1)
+    matrix2 = subject.collect(matrix2)
+    matrix1_cortex = matrix1[CORTEX, CORTEX]
+    matrix2_cortex = matrix2[CORTEX, CORTEX]
+    correlation = np.corrcoef(matrix1_cortex.ravel(), matrix2_cortex.ravel())
+    return float(correlation[0, 1])
