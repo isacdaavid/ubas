@@ -472,7 +472,7 @@ class Cohort(set):
                 Whether to return `(subject.label, value)` tuples or just values.
             max_workers (Optional[int]):
                 Maximum number of processes to spawn in parallel.
-            kwargs (Mapping[str, Any]):
+            **kwargs (Mapping[str, Any]):
                 Variable named arguments passed as `quantity(subject, **kwargs)`
 
         Returns:
@@ -507,6 +507,8 @@ class Cohort(set):
 
         if max_workers is None:
             max_workers = max(1, os.cpu_count() - 2)
+        if max_workers < 1:
+            max_workers = 1
 
         # Submit task for each Subject in parallel.
         with concurrent.futures.ProcessPoolExecutor(
