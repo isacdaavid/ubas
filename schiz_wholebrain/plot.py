@@ -84,8 +84,8 @@ def min_alpha(
 
 
 def plottify(
-        func: Callable[..., Tuple[plt.Figure, plt.Axes]],
-) ->  Callable[..., Union[Tuple[plt.Figure, plt.Axes], None]]:
+        func: Callable[..., tuple[plt.Figure, plt.Axes]],
+) ->  Callable[..., Union[tuple[plt.Figure, plt.Axes], None]]:
     """Decorator to add routine properties and behaviors to plotting functions.
 
     Args:
@@ -154,7 +154,7 @@ def connectivity(
         labels: Sequence[str] = [],
         colorbar: bool = True,
         fontsize: float = FONTSIZE,
-) -> Tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]:
+) -> tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]:
     """Visualize a connectivity matrix as a heatmap.
 
     Args:
@@ -202,7 +202,7 @@ def density(
         distributions: Mapping[str, Iterable[float]],
         bins: int = 10,
         fontsize: float = FONTSIZE,
-) -> Tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]:
+) -> tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]:
     """
     Args:
         distributions (Mapping[str, Iterable[float]]):
@@ -232,7 +232,7 @@ def repeated_measures(
         subject_colors: Optional[Mapping[str, str]] = None,
         subject_groups: Optional[Mapping[str, str]] = None,
         fontsize: float = FONTSIZE,
-) -> Tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]:
+) -> tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]:
     """
     Plot repeated measures as bars (mean ± std) and individual time series.
 
@@ -251,15 +251,18 @@ def repeated_measures(
     fig, ax = plt.subplots()
     # Plot bars with mean and std error for each measurement.
     for i, measure in enumerate(measures):
-        values = np.array(list(measures[measure].values()))
-        ax.bar(i, values.mean(), yerr=values.std(), color='gray')
+        values = np.array(
+            [x if x is not None else np.nan for x in measures[measure].values()]
+        )
+        ax.bar(i, np.nanmean(values), yerr=np.nanstd(values), color='gray')
 
     # Gather time series for each unique Subject key across measurements.
     time_series = defaultdict(list)
 
     for measure in measures.values():
         for subject_label, datum in measure.items():
-            time_series[subject_label].append(datum)
+            if datum:
+                time_series[subject_label].append(datum)
 
     # Plot Subject time series on top of measure bars.
     unique_labels = {}
@@ -288,7 +291,7 @@ def repeated_measures(
 def scatter(
         groups: Mapping[str, Iterable[float]],
         fontsize: float = FONTSIZE,
-) -> Tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]:
+) -> tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]:
     """
     Args:
         groups (Mapping[str, Iterable[float]]):
@@ -317,7 +320,7 @@ def compose(
     figsize: Optional[Sequence[float]] = None,
     fontsize: float = FONTSIZE,
     output: bool = False,
-) -> Union[None, Tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]]:
+) -> Union[None, tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]]:
     """
     Arrange a list of subplots in a grid.
 
