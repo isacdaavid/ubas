@@ -88,11 +88,8 @@ def aln_model(
         structural = subject.quantities['cohort_mean_raw_count']
         distances =  subject.quantities['cohort_mean_mean_length']
     else:
-        structural = subject.structural_connectivity[ATLAS].normalize('raw_count')
-        # Don't normalize distances, only average with transpose to
-        # make symmetrical. Some model parameters are distance-sensitive.
+        structural = subject.structural_connectivity[ATLAS].raw_count
         distances = subject.structural_connectivity[ATLAS].mean_length
-        distances = (distances + distances.T) / 2
 
     structural_cortex = structural[CORTEX, CORTEX]
     distances_cortex = distances[CORTEX, CORTEX]
@@ -154,7 +151,7 @@ def aln_model(
     }
 
     model.params.update(parameters)
-    model.run(chunkwise=True, chunksize=60000, bold=True)
+    model.run(chunkwise=True, chunksize=20000, bold=True)
     return model
 
 
