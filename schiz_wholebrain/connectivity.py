@@ -14,26 +14,13 @@ class Connectivity():
     def region_labels(self):
         return self._region_labels
 
-    def normalize(self, connectivity_matrix: str):
+    def make_symmetrical(self, connectivity_matrix: str):
         matrix = getattr(self, connectivity_matrix)
 
-        if not isinstance(matrix, np.ndarray):
-            raise TypeError(
-                'Cannot normalize {} of type {}.'.format(
-                    connectivity_matrix,
-                    type(matrix),
-                )
-            )
-
         if matrix.shape[0] != matrix.shape[1] or matrix.ndim != 2:
-            raise ValueError(
-                'Cannot normalize non-square {}.'.format(
-                    connectivity_matrix,
-                )
-            )
+            raise ValueError(f'{connectivity_matrix} is not a square matrix.')
 
-        matrix = matrix + matrix.T
-        return matrix / np.max(matrix)
+        return matrix + matrix.T
 
     def __repr__(self):
         return f"{self.__class__.__name__}"
@@ -119,16 +106,26 @@ class StructuralConnectivity(Connectivity):
 
     @property
     def mean_length(self):
-        return self._mean_length
+        matrix = self.make_symmetrical('_mean_length')
+        np.fill_diagonal(matrix, 0)
+        # Don't normalize distances, only average with transpose to
+        # make symmetrical. Some model parameters are unit-sensitive.
+        return matrix / 2
 
     @property
     def raw_count(self):
-        return self._raw_count
+        matrix = self.make_symmetrical('_raw_count')
+        np.fill_diagonal(matrix, 0)
+        return matrix / matrix.max()
 
     @property
     def sift_count(self):
-        return self._sift_count
+        matrix = self.make_symmetrical('_sift_count')
+        np.fill_diagonal(matrix, 0)
+        return matrix / matrix.max()
 
     @property
     def weighted_sift_count(self):
-        return self._weighted_sift_count
+        matrix = self.make_symmetrical('_weighted_sift_count')
+        np.fill_diagonal(matrix, 0)
+        return matrix / matrix.max()
