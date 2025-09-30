@@ -4,12 +4,11 @@ Class to represent individual participants.
 
 import re
 from types import SimpleNamespace
-from typing import Any, Callable, Iterable, Mapping, Optional, TypeVar, Union
-
-import numpy as np
+from typing import (
+    Any, Callable, Dict, Iterable, Mapping, Optional, TypeVar, Union
+)
 
 from .connectivity import FunctionalConnectivity, StructuralConnectivity
-from .load import load_matlab, load_tsv
 
 # Type variable for Subject or its subclasses
 SubjectT = TypeVar('SubjectT', bound='Subject')
@@ -25,7 +24,7 @@ class Subject:
             structural_derivatives: Optional[str] = None,
             functional_session_label: Optional[str] = None,
             functional_derivatives: Optional[str] = None,
-            atlases: Iterable = ['4S156', '4S256', '4S456'],
+            atlases: Iterable = ('4S156', '4S256', '4S456'),
             demographics: Optional[Mapping] = None,
     ):
         self._label = subject_label
@@ -61,8 +60,8 @@ class Subject:
             structural = self.structural_connectivity[atlas]
             functional = self.functional_connectivity[atlas]
             bundle = SimpleNamespace(
-                structural = structural,
-                functional = functional,
+                structural=structural,
+                functional=functional,
             )
 
             # TODO: Pass properly decorated getters from getter factory instead.

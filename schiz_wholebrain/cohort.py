@@ -31,6 +31,7 @@ SubjectT = TypeVar('SubjectT', bound=Subject)
 # Generic type for the attribute value
 T = TypeVar('T')
 
+
 class Cohort(set):
     """A specialized set class to manage a cohort of Subjects in a study.
 
@@ -120,7 +121,7 @@ class Cohort(set):
         super().remove(subject)
         del self._label_to_subject[subject.label]
 
-    def __getitem__(self, index: str) -> SubjectT:
+    def __getitem__(self, index: str) -> Subject:
         """Retrieve a Subject from the Cohort by its label in O(1) time.
 
         Args:
@@ -147,7 +148,7 @@ class Cohort(set):
         except KeyError:
             raise KeyError(f"No subject found with label: {index}")
 
-    def __contains__(self, item: Union[str, SubjectT]) -> bool:
+    def __contains__(self, item: object) -> bool:
         """Check if a Subject or a subject label exists in the Cohort.
 
         Args:
@@ -178,7 +179,7 @@ class Cohort(set):
             demographics_file: str,
             structural_derivatives: BIDSLayout,
             functional_derivatives: BIDSLayout,
-            atlases: Iterable = ['4S156', '4S256', '4S456'],
+            atlases: Iterable = ('4S156', '4S256', '4S456'),
             sample_size: Optional[int] = None,
     ) -> 'Cohort':
         """Constructs a pre-filled Cohort instance from data.
@@ -353,19 +354,19 @@ class Cohort(set):
             # Select subject from cohort-wide demographics data.
             subject_demographics = clean_data[clean_data[:, 0] == label, :]
 
-            subject_demographics = {
+            demographics = {
                 'age': int(subject_demographics[0, 1]),
                 'sex': str(subject_demographics[0, 2]),
                 'subdiagnosis': str(subject_demographics[0, 3]),
             }
 
-            subject_demographics['diagnosis'] = (
+            demographics['diagnosis'] = (
                 'HC'
-                if subject_demographics['subdiagnosis'] == 'No_Known_Disorder'
+                if demographics['subdiagnosis'] == 'No_Known_Disorder'
                 else 'SSD'
             )
 
-            yield subject_demographics
+            yield demographics
 
     # TODO: parallelize?
     # TODO: shortcircuit if some subject returns, e.g., None.
@@ -506,7 +507,7 @@ class Cohort(set):
             key = quantity.__name__
 
         if max_workers is None:
-            max_workers = max(1, os.cpu_count() - 2)
+            max_workers = max(1, (os.cpu_count() or 1) - 2)
         if max_workers < 1:
             max_workers = 1
 
@@ -519,7 +520,7 @@ class Cohort(set):
                 for subject in self
             }
 
-            results = {}
+            results = set()
             for future in tqdm(
                     concurrent.futures.as_completed(futures_to_subjects),
                     total=len(futures_to_subjects),

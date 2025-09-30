@@ -6,7 +6,7 @@ from collections import defaultdict
 from functools import wraps
 from math import floor
 from typing import (
-    Any, Callable, Dict, Iterable, Mapping, Optional, Sequence, Union
+    Any, Callable, Iterable, Mapping, Optional, Sequence, Union
 )
 
 import matplotlib
@@ -33,8 +33,8 @@ plt.rcParams.update({
 
 def jitter(
         positions: Sequence[float],
-        amount: float=JITTER,
-) -> np.ndarray[float]:
+        amount: float = JITTER,
+) -> np.ndarray:
     """Offset numerical positions by some random amount.
 
     Args:
@@ -44,7 +44,7 @@ def jitter(
             Maximum jitter amount to add or subtract at random.
 
     Returns:
-        np.ndarray[float]:
+        np.ndarray:
             Jittered vector, with each original value changed within ±amount.
 
     Example:
@@ -85,7 +85,7 @@ def min_alpha(
 
 def plottify(
         func: Callable[..., tuple[plt.Figure, plt.Axes]],
-) ->  Callable[..., Union[tuple[plt.Figure, plt.Axes], None]]:
+) -> Callable[..., Union[tuple[plt.Figure, plt.Axes], None]]:
     """Decorator to add routine properties and behaviors to plotting functions.
 
     Args:
@@ -110,7 +110,7 @@ def plottify(
     def wrapper(
             *args,
             title: str = "",
-            figsize: Optional[Sequence[float]] = None,
+            figsize: Optional[tuple[float, float]] = None,
             axislabels: Sequence[str] = ("", "", ""),
             fontsize: float = FONTSIZE,
             output: bool = False,
@@ -126,10 +126,8 @@ def plottify(
 
         ax.set_title(title, fontsize=fontsize)
 
-        try:
-            setters = [ax.set_xlabel, ax.set_ylabel, ax.set_zlabel]
-        except AttributeError:
-            setters = [ax.set_xlabel, ax.set_ylabel]
+        setters: list[Callable[..., Any]] = [ax.set_xlabel, ax.set_ylabel]
+
         for label, setter in zip(axislabels, setters):
             setter(label, fontsize=fontsize)
 
@@ -151,7 +149,7 @@ def plottify(
 @plottify
 def connectivity(
         matrix: np.ndarray,
-        labels: Sequence[str] = [],
+        labels: Sequence[str] = (),
         colorbar: bool = True,
         fontsize: float = FONTSIZE,
 ) -> tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]:
@@ -188,7 +186,7 @@ def connectivity(
     ax.set_xticks(range(len(labels)))
     ax.set_xticklabels(labels, rotation='vertical', fontsize=0.2 * fontsize)
     ax.set_yticks(range(len(labels)))
-    ax.set_yticklabels(labels, fontsize=0.2 * fontsize )
+    ax.set_yticklabels(labels, fontsize=0.2 * fontsize)
 
     if colorbar:
         cbar = plt.colorbar(im, ax=ax)
@@ -199,13 +197,13 @@ def connectivity(
 
 @plottify
 def density(
-        distributions: Mapping[str, Iterable[float]],
+        distributions: Mapping[str, Sequence[float]],
         bins: int = 10,
         fontsize: float = FONTSIZE,
 ) -> tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]:
     """
     Args:
-        distributions (Mapping[str, Iterable[float]]):
+        distributions (Mapping[str, Sequence[float]]):
             Named samples of measurements
         bins (int):
             Number of bins to divide each histogram.
@@ -228,7 +226,7 @@ def density(
 
 @plottify
 def repeated_measures(
-        measures: Mapping[str, Mapping[str, Any]],
+        measures: dict[str, Mapping[str, Any]],
         subject_colors: Optional[Mapping[str, str]] = None,
         subject_groups: Optional[Mapping[str, str]] = None,
         fontsize: float = FONTSIZE,
@@ -237,7 +235,7 @@ def repeated_measures(
     Plot repeated measures as bars (mean ± std) and individual time series.
 
     Args:
-        measures (Mapping[str, Mapping[str, Any]]):
+        measures (Mapping[str, Mapping[str, float]]):
             A dict of measurement names to subject data ({subject: datum}).
         subject_colors (Optional[Mapping[str, str]]):
             Optional dict of subject labels to colors.
@@ -308,7 +306,11 @@ def scatter(
         x = jitter([i] * len(values))
         ax.plot(x, values, 'o')
 
-    plt.xticks(range(len(groups)), groups.keys(), fontsize=fontsize)
+    plt.xticks(
+        range(len(groups)),
+        list(groups.keys()),
+        fontsize=fontsize,
+    )
     plt.xlim(-0.5, len(groups) - 0.5)
     return fig, ax
 
@@ -317,7 +319,7 @@ def compose(
     plots: Sequence[tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]],
     shape: Sequence[int] = (1, 1),
     title: str = "",
-    figsize: Optional[Sequence[float]] = None,
+    figsize: Optional[tuple[float, float]] = None,
     fontsize: float = FONTSIZE,
     output: bool = False,
 ) -> Union[None, tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]]:
@@ -341,7 +343,7 @@ def compose(
         fig.suptitle(title, fontsize=fontsize)
 
     # Iterate over subplots.
-    for i, (subfig, subax) in enumerate(plots):
+    for i, (_, subax) in enumerate(plots):
         # Create a subplot in the composite figure.
         ax = fig.add_subplot(shape[0], shape[1], i + 1)
 
@@ -373,7 +375,7 @@ def compose(
                 continue
 
             # Lines from plot, scatter, hist.
-            elif isinstance(artist, matplotlib.lines.Line2D):
+            if isinstance(artist, matplotlib.lines.Line2D):
                 x, y = artist.get_data()
                 ax.plot(x, y, **artist_properties(artist))
 
@@ -422,15 +424,6 @@ def compose(
                             paths, **properties
                         )
                         ax.add_collection(collection)
-                    elif hasattr(artist, 'get_offsets'):
-                        offsets = artist.get_offsets()
-                        if hasattr(artist, 'get_sizes'):
-                            sizes = artist.get_sizes()
-                            collection = matplotlib.collections.ScatterCollection(
-                                sizes, **properties
-                            )
-                            new_coll.set_offsets(offsets)
-                            ax.add_collection(new_coll)
 
             else:
                 raise NotImplementedError(
@@ -448,7 +441,7 @@ def compose(
 
 def artist_properties(
         artist: matplotlib.artist.Artist,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Extract a dictionary of visual properties from a matplotlib artist.
 
     Dynamically retrieves common visual properties (e.g., color, linestyle,
@@ -461,7 +454,7 @@ def artist_properties(
             A matplotlib artist object from which to extract properties.
 
     Returns:
-        Dict[str, Any]:
+        dict[str, Any]:
             A mapping of property names to their corresponding values.
 
     Example:
@@ -591,7 +584,7 @@ def run_method(
         '<MISSING>'
     """
     try:
-        attr =  getattr(obj, method)
+        attr = getattr(obj, method)
     except AttributeError:
         return MISSING
     if callable(attr):

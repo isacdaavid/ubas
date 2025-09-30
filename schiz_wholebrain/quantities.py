@@ -5,7 +5,6 @@ Functions to compute measurements of interest on `Subject` data.
 from typing import Optional, Sequence, TypeVar
 
 from neurolib.models.aln import ALNModel
-import neurolib.utils.functions
 import numpy as np
 
 from .subject import Subject
@@ -23,7 +22,7 @@ def aln_functional_connectivity(
         model_key: str = 'aln_model',
         bandpass: Optional[Sequence[float]] = None,
         sampling_rate: Optional[float] = None,
-) -> np.ndarray[float]:
+) -> np.ndarray:
     """Obtain functional connectivity matrix from BOLD simulation in ALN model.
 
     Args:
@@ -61,8 +60,8 @@ def aln_functional_connectivity(
 
 def aln_model(
         subject: SubjectT,
-        mean_structural: bool=False,
-        duration: int=300,
+        mean_structural: bool = False,
+        duration: int = 300,
 ) -> ALNModel:
     """Simulation of Adaptive Linear-Nonlinear neural mass model.
 
@@ -86,7 +85,7 @@ def aln_model(
     """
     if mean_structural:
         structural = subject.quantities['cohort_mean_raw_count']
-        distances =  subject.quantities['cohort_mean_mean_length']
+        distances = subject.quantities['cohort_mean_mean_length']
     else:
         structural = subject.structural_connectivity[ATLAS].raw_count
         distances = subject.structural_connectivity[ATLAS].mean_length
@@ -94,57 +93,57 @@ def aln_model(
     structural_cortex = structural[CORTEX, CORTEX]
     distances_cortex = distances[CORTEX, CORTEX]
 
-    model = ALNModel(Cmat = structural_cortex, Dmat = distances_cortex)
+    model = ALNModel(Cmat=structural_cortex, Dmat=distances_cortex)
     # Default values between brackets.
     parameters = {
-        'duration': duration * 1000, # 5 min x 60 s x 1000 ms.
+        'duration': duration * 1000,  # 5 min x 60 s x 1000 ms.
         # Global constants.
-        'signalV': 20, # [20 m/s] global signal speed.
-        'c_gl': 0.3,   # [0.3] global current?
-        'Ke_gl': 300, # [250] global coupling between E populations.
+        'signalV': 20,  # [20 m/s] global signal speed.
+        'c_gl': 0.3,    # [0.3] global current?
+        'Ke_gl': 300,   # [250] global coupling between E populations.
         # Background input to E and I populations.
-        'mue_ext_mean': 1.63,   # [0.4 mV/ms] mean ext input to E.
-        'mui_ext_mean': 0.05,   # [0.3 mV/ms] mean ext input to I.
-        'ext_exc_rate': 0.0,    # [0.0]
-        'ext_inh_rate': 0.0,    # [0.0]
-        'ext_exc_current': 0.0, # [0.0]
-        'ext_inh_current': 0.0, # [0.0]
-        'sigmae_ext': 1.5,      # [1.5 mV/√ms] std dev ext input to E.
-        'sigmai_ext': 1.5,      # [1.5 mV/√ms] std dev ext input to I.
+        'mue_ext_mean': 1.63,    # [0.4 mV/ms] mean ext input to E.
+        'mui_ext_mean': 0.05,    # [0.3 mV/ms] mean ext input to I.
+        'ext_exc_rate': 0.0,     # [0.0]
+        'ext_inh_rate': 0.0,     # [0.0]
+        'ext_exc_current': 0.0,  # [0.0]
+        'ext_inh_current': 0.0,  # [0.0]
+        'sigmae_ext': 1.5,       # [1.5 mV/√ms] std dev ext input to E.
+        'sigmai_ext': 1.5,       # [1.5 mV/√ms] std dev ext input to I.
         # Number of inputs per neuron.
         'Ke': 800,    # [800] E inputs.
         'Ki': 200,    # [200] I inputs.
         # Synaptic constants.
-        'de': 4.0,     # [4.0 ms] delay to E neurons.
-        'di': 2.0,     # [2.0 ms] delay to I neurons.
-        'tau_se': 2.0, # [2.0 ms] E synapse time constant.
-        'tau_si': 5.0, # [5.0 ms] I synapse time constant.
-        'tau_de': 1.0, # [1.0 ms] delay to E time constant?
-        'tau_di': 1.0, # [1.0 ms] delay to I time constant?
+        'de': 4.0,      # [4.0 ms] delay to E neurons.
+        'di': 2.0,      # [2.0 ms] delay to I neurons.
+        'tau_se': 2.0,  # [2.0 ms] E synapse time constant.
+        'tau_si': 5.0,  # [5.0 ms] I synapse time constant.
+        'tau_de': 1.0,  # [1.0 ms] delay to E time constant?
+        'tau_di': 1.0,  # [1.0 ms] delay to I time constant?
         # Maximum post-synaptic currents.
         'cee': 0.3,   # [0.3 mV/ms] AMPA E to E.
         'cie': 0.3,   # [0.3 mV/ms] AMPA E to I.
         'cei': 0.5,   # [0.5 mV/ms] GABA I to E.
         'cii': 0.5,   # [0.5 mV/ms] GABA I to I.
         # Maximum synaptic currents.
-        'Jee_max': 2.43,  # [2.43 mV/ms] E to E limit.
-        'Jie_max': 2.6,  # [2.6 mV/ms] E to I limit.
-        'Jei_max': -3.3, # [-3.3 mV/ms] I to E limit.
-        'Jii_max': -1.64, # [-1.64 mV/ms] I to I limit.
+        'Jee_max': 2.43,   # [2.43 mV/ms] E to E limit.
+        'Jie_max': 2.6,    # [2.6 mV/ms] E to I limit.
+        'Jei_max': -3.3,   # [-3.3 mV/ms] I to E limit.
+        'Jii_max': -1.64,  # [-1.64 mV/ms] I to I limit.
         # Turn on spike-triggered adaptation currents.
         'a': 28.26,   # [0 nS] subthreshold adaptation conductance.
         'b': 24.04,   # [0 pA] spike-triggered current increment.
         'EA': -80,    # [-80 mV] adaptation reversal potential.
         'tauA': 200,  # [200 ms] adaptation time constant.
         # Membrane and other constants.
-        'C': 200,      # [200 pF] membrane capacitance.
-        'gL': 10,      # [10 nS] leak conductance.
-        'EL': -65,     # [-65 mV] leak reversal potential.
-        'DeltaT': 1.5, # [1.5 mV] threshold slope factor.
-        'VT': -50,     # [-50 mV] threshold voltage.
-        'Vr': -70,     # [-70 mV] rate threshold voltage.
-        'Vs': -40,     # [-40 mV] spike threshold voltage.
-        'Tref': 1.5,   # [1.5 ms] refractory period.
+        'C': 200,       # [200 pF] membrane capacitance.
+        'gL': 10,       # [10 nS] leak conductance.
+        'EL': -65,      # [-65 mV] leak reversal potential.
+        'DeltaT': 1.5,  # [1.5 mV] threshold slope factor.
+        'VT': -50,      # [-50 mV] threshold voltage.
+        'Vr': -70,      # [-70 mV] rate threshold voltage.
+        'Vs': -40,      # [-40 mV] spike threshold voltage.
+        'Tref': 1.5,    # [1.5 ms] refractory period.
         # Ornstein-Uhlenbeck noise (brownian walk + mean drift + mean reversion).
         'tau_ou': 5.0,            # [5.0 ms]
         'sigma_ou': 0.19,         # [0] std. dev.
@@ -160,7 +159,7 @@ def bandpass_filter(
     sampling_rate: float,
     low_freq: float,
     high_freq: float,
-) -> np.ndarray[float]:
+) -> np.ndarray:
     """
     Apply a bandpass filter to each row of a time-series matrix.
 
@@ -175,7 +174,8 @@ def bandpass_filter(
             High cutoff frequency in Hz.
 
     Returns:
-        Filtered time-series in the time domain.
+        np.ndarray:
+            Filtered time-series in the time domain.
     """
     n_signals, n_samples = data.shape
     filtered_data = np.zeros_like(data)
@@ -196,7 +196,10 @@ def bandpass_filter(
     return filtered_data
 
 
-def connectivity_strength(subject: SubjectT, absolute=True) -> np.ndarray[float]:
+def connectivity_strength(
+        subject: SubjectT,
+        absolute=True,
+) -> np.ndarray:
     """Connectivity Strength (Global Brain Connectivity) of connectivity matrix.
 
     The connectivity strength of a node is defined as its average connectivity
@@ -209,7 +212,7 @@ def connectivity_strength(subject: SubjectT, absolute=True) -> np.ndarray[float]
             Whether to return bare (absolute) strengths or normalize to z-scores.
 
     Return:
-        np.array:
+        np.ndarray:
             A 1-dimensional array with the connectivity strength of each node.
     """
     correlation = subject.functional_connectivity[ATLAS].correlation_matrix
@@ -242,9 +245,7 @@ def matrix2matrix_correlation(
         float:
             Pearson correlation.
     """
-    matrix1 = subject.collect(matrix1)
-    matrix2 = subject.collect(matrix2)
-    matrix1_cortex = matrix1[CORTEX, CORTEX]
-    matrix2_cortex = matrix2[CORTEX, CORTEX]
+    matrix1_cortex = subject.collect(matrix1)[CORTEX, CORTEX]
+    matrix2_cortex = subject.collect(matrix2)[CORTEX, CORTEX]
     correlation = np.corrcoef(matrix1_cortex.ravel(), matrix2_cortex.ravel())
     return float(correlation[0, 1])

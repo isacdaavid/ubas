@@ -7,6 +7,7 @@ def load_matlab(file_path):
     data = scipy.io.loadmat(file_path)
     return data
 
+
 def load_tsv(file_path):
     """Load matrix in TSV format."""
     data = np.loadtxt(file_path, delimiter='\t', dtype=str)

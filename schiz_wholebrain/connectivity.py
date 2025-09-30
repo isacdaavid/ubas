@@ -10,10 +10,6 @@ from .load import load_matlab, load_tsv
 
 
 class Connectivity():
-    @property
-    def region_labels(self):
-        return self._region_labels
-
     def make_symmetrical(self, connectivity_matrix: str):
         matrix = getattr(self, connectivity_matrix)
 
@@ -49,6 +45,10 @@ class FunctionalConnectivity(Connectivity):
             _, self._motion_outliers = load_tsv(runs[0])
         except FileNotFoundError as error:
             print(error)
+
+    @property
+    def region_labels(self):
+        return self._region_labels
 
     @property
     def time_series(self):
@@ -99,6 +99,10 @@ class StructuralConnectivity(Connectivity):
         self._raw_count = data[3]
         self._sift_count = data[4]
         self._weighted_sift_count = data[5]
+
+    @property
+    def region_labels(self):
+        return self._region_labels
 
     @property
     def region_ids(self):
