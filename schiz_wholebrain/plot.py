@@ -196,9 +196,10 @@ def connectivity(
 
 
 @plottify
-def density(
+def distribution(
         distributions: Mapping[str, Sequence[float]],
         bins: int = 10,
+        density: bool = True,
         fontsize: float = FONTSIZE,
 ) -> tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]:
     """
@@ -207,6 +208,8 @@ def density(
             Named samples of measurements
         bins (int):
             Number of bins to divide each histogram.
+        density (bool):
+            Whether to plot probability density or frequency.
         Plus everything listed in `help(plot.plottify)`.
 
     Returns:
@@ -215,8 +218,14 @@ def density(
     fig, ax = plt.subplots()
     alpha = min_alpha(len(distributions))
 
-    for label, distribution in distributions.items():
-        ax.hist(distribution, alpha=alpha, bins=bins, label=label)
+    for label, dist in distributions.items():
+        ax.hist(
+            dist,
+            alpha=alpha,
+            bins=bins,
+            density=density,
+            label=label,
+        )
 
     if len(distributions) > 1:
         ax.legend(fontsize=fontsize)
