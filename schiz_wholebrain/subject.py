@@ -163,7 +163,7 @@ class Subject:
             self,
             quantity: Callable[[SubjectT], Any],
             key: Optional[str] = None,
-            output: Optional[bool] = False,
+            output: bool = False,
             **kwargs: Mapping[str, Any],
     ) -> Union[None, Any]:
         """Compute a quantity for this Subject and store the result.
@@ -177,7 +177,7 @@ class Subject:
                 A function that takes a Subject and returns a computed value.
             key (Optional[str]):
                 Override key name under which quantity will be stored.
-            output (Optional[bool]):
+            output (bool):
                 Whether to return result instead of storing it.
             kwargs (Mapping[str, Any]):
                 Variable named arguments passed as `quantity(subject, **kwargs)`
