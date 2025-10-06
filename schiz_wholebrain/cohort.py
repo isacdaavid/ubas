@@ -374,7 +374,7 @@ class Cohort(set):
         self,
         attr_name: str,
         default: Optional[T] = None,
-        subject_labels: Optional[bool] = False,
+        subject_labels: bool = False,
     ) -> Generator[Union[Any, Tuple[str, Any]], None, None]:
         """Extracts a specific attribute from all Subjects in the Cohort.
 
@@ -389,7 +389,7 @@ class Cohort(set):
                 The path to the attribute or dictionary value to collect.
             default (Optional[T]):
                 The default value to yield if the attribute is not found.
-            subject_labels (Optional[bool]):
+            subject_labels (bool):
                 Whether to yield `(subject.label, value)` tuples or just values.
 
         Yields:
@@ -443,9 +443,9 @@ class Cohort(set):
     def compute(
             self,
             quantity: Callable[[SubjectT], Any],
-            output: Optional[bool] = False,
+            output: bool = False,
             key: Optional[str] = None,
-            subject_labels: Optional[bool] = False,
+            subject_labels: bool = False,
             max_workers: Optional[int] = None,
             **kwargs: Mapping[str, Any],
     ) -> Union[None, Union[Set[Any], Dict[str, Any]]]:
@@ -465,11 +465,11 @@ class Cohort(set):
         Args:
             quantity (Callable[[SubjectT], Any]):
                 A function that takes a Subject and returns a computed value.
-            output (Optional[bool]):
+            output (bool):
                 Whether to return results instead of storing them.
             key (Optional[str]):
                 Override key name under which quantity will be stored.
-            subject_labels (Optional[bool]):
+            subject_labels (bool):
                 Whether to return `(subject.label, value)` tuples or just values.
             max_workers (Optional[int]):
                 Maximum number of processes to spawn in parallel.
