@@ -19,7 +19,7 @@ from typing import (
     Union,
 )
 
-from bids import BIDSLayout
+from bids import BIDSLayout     # type: ignore
 import numpy as np
 from tqdm import tqdm
 
@@ -39,7 +39,7 @@ class Cohort(set):
         labels: (Set[str]): The labels of all Subjects contained in this Cohort.
     """
 
-    def __init__(self, subjects: Iterable[SubjectT]):
+    def __init__(self, subjects: Iterable[Subject]):
         """Initialize a Cohort with an iterable of Subject objects.
 
         Args:
@@ -265,8 +265,10 @@ class Cohort(set):
             }
 
             subjects = {
-                future.result() for future in
-                tqdm(concurrent.futures.as_completed(futures), total=len(futures))
+                future.result() for future in tqdm(
+                    concurrent.futures.as_completed(futures),
+                    total=len(futures)
+                )
             }
 
         return cls(subjects)
@@ -368,49 +370,7 @@ class Cohort(set):
 
             yield demographics
 
-    # TODO: parallelize?
-    # TODO: shortcircuit if some subject returns, e.g., None.
-    def collect(
-        self,
-        attr_name: str,
-        default: Optional[T] = None,
-        subject_labels: bool = False,
-    ) -> Generator[Union[Any, Tuple[str, Any]], None, None]:
-        """Extracts a specific attribute from all Subjects in the Cohort.
-
-        This generator iterates over all Subjects in the Cohort and yields the
-        requested attribute value for each of them. Nested attributes can be
-        collected using dot notation (e.g. "connectivity.functional"), unquoted
-        dictionary keys (e.g. "quantities[fcs]") or both. If a Subject does not
-        have the attribute, the default value is yielded instead.
-
-        Args:
-            attr_name (str):
-                The path to the attribute or dictionary value to collect.
-            default (Optional[T]):
-                The default value to yield if the attribute is not found.
-            subject_labels (bool):
-                Whether to yield `(subject.label, value)` tuples or just values.
-
-        Yields:
-            Union[Any, Tuple[str, Any]]:
-                The value of the attribute for each Subject.
-
-        Example:
-            >>> cohort = Cohort([
-            ...     Subject('Álvaro', demographics={'age': 30}),
-            ...     Subject('Beatriz', demographics={'age': 12})
-            ... ])
-            >>> list(cohort.collect("demographics[age]"))
-            [30, 12]
-            >>> dict(cohort.collect("EEG", default=0, subject_labels=True))
-            {'Álvaro': 0, 'Beatriz': 0}
-        """
-        for subject in self:
-            value = subject.collect(attr_name, default)
-            yield (subject.label, value) if subject_labels else value
-
-    # TODO: parallelize?
+# TODO: parallelize?
     def filter(self, condition: Callable[[SubjectT], bool]) -> 'Cohort':
         """Create Cohort subset with Subjects who satisfy the condition.
 
@@ -440,76 +400,191 @@ class Cohort(set):
         subcohort = filter(condition, self)
         return type(self)(subcohort)
 
+    # TODO: parallelize?
+    # TODO: option to shortcircuit on Subject fail.
+    def collect(
+        self,
+        attr_name: str,
+        default: Optional[T] = None,
+        subject_labels: bool = True,
+    ) -> Generator[Union[Any, Tuple[str, Any]], None, None]:
+        """Extract a specific attribute from all Subjects in the Cohort.
+
+        This generator iterates over all Subjects in the Cohort and yields the
+        requested attribute value for each of them. Nested attributes can be
+        collected using dot notation (e.g. "connectivity.functional"), unquoted
+        dictionary keys (e.g. "quantities[fcs]") or both. If a Subject does not
+        have the attribute, the default value is yielded instead.
+
+        Args:
+            attr_name (str):
+                The path to the attribute or dictionary value to collect.
+            default (Optional[T]):
+                The default value to yield if the attribute is not found.
+            subject_labels (bool):
+                Whether to yield `(subject.label, value)` tuples or just values.
+
+        Yields:
+            Union[Any, Tuple[str, Any]]:
+                The value of the attribute for each Subject.
+
+        Example:
+            >>> cohort = Cohort([
+            ...     Subject('Álvaro', demographics={'age': 30}),
+            ...     Subject('Beatriz', demographics={'age': 12})
+            ... ])
+            >>> list(cohort.collect("demographics[age]", subject_labels=False))
+            [30, 12]
+            >>> dict(cohort.collect("EEG", default=0))
+            {'Álvaro': 0, 'Beatriz': 0}
+        """
+        for subject in self:
+            value = subject.collect(attr_name, default)
+            yield (subject.label, value) if subject_labels else value
+
+    # TODO: parallelize?
+    # TODO: atomic thread-safety
+    def store(
+            self,
+            attr_name: str,
+            value: Union[Any, Dict[str, Any]],
+            subject_labels: bool = False,
+            strict: bool = True,
+    ) -> None:
+        """Store a value in a specific attribute for each Subject in the Cohort.
+
+        Nested attributes can be stored using dot notation
+        (e.g. "connectivity.functional"), unquoted dictionary keys
+        (e.g. "quantities[fcs]"), or both. Different values can be stored for
+        each `Subject` with the option `subject_labels=True` and passing a
+        dictionary with ('label', value) pairs.
+
+        Args:
+            attr_name (str):
+                The path to the attribute or dictionary value to modify.
+            value (Union[Any, Dict[str, Any]]):
+                The value(s) to store.
+            subject_labels (bool):
+                Whether to store a different value per subject using a dict.
+            strict (bool):
+                Whether to validate labels beforehand if `subject_labels=True`.
+
+        Returns:
+            None:
+                Subjects' attributes may be modified as side effect.
+
+        Raises:
+            TypeError:
+                If `subject_labels=True` and `value` isn't instance of Dict.
+            KeyError:
+                If `strict=True` and value Dict has extra or missing keys.
+        Example:
+            >>> cohort = Cohort([
+            ...     Subject('Álvaro', demographics={'age': 30}),
+            ...     Subject('Beatriz', demographics={'age': 12})
+            ... ])
+            >>> cohort.store('demographics', None)
+            >>> cohort['Beatriz'].demographics
+            None
+            >>> cohort.store(
+            ...     'demographics',
+            ...     {'Álvaro': {'age': 31}, 'Beatriz': {'age': 13}},
+            ...     subject_labels=True
+            ... )
+            >>> r = cohort.collect("demographics[age]")
+            >>> set(r) == {31, 13}
+            True
+        """
+        # Validate input type.
+        if subject_labels and not isinstance(value, Dict):
+            raise TypeError('Expected a dictionary with values.')
+
+        # Validate subject labels.
+        if subject_labels and strict:
+            provided_labels = set(value.keys())
+
+            if self.labels != provided_labels:
+                extra = provided_labels - self.labels
+                missing = self.labels - provided_labels
+
+                messages = []
+
+                if missing:
+                    messages.append(f"Missing keys: {missing}")
+                if extra:
+                    messages.append(f"Extra keys: {extra}")
+
+                messages.append("Bypass mismatch with store(strict=False).")
+                raise KeyError("\n".join(messages))
+
+        # Store values.
+        for subject in self:
+            subject_value = value[subject.label] if subject_labels else value
+            subject.store(attr_name, subject_value)
+
     def compute(
             self,
             quantity: Callable[[SubjectT], Any],
-            output: bool = False,
             key: Optional[str] = None,
-            subject_labels: bool = False,
+            store: bool = True,
             max_workers: Optional[int] = None,
             **kwargs: Mapping[str, Any],
-    ) -> Union[None, Union[Set[Any], Dict[str, Any]]]:
+    ) -> Union[Set[Any], Dict[str, Any]]:
         """Apply a function to each Subject in parallel.
 
         This method applies a user-provided function (`quantity`) to each
-        Subject in the Cohort and stores the result in the Subject's
-        `quantities` dictionary. If `output` is True, results will be returned
-        instead of stored. If no `key` is provided, the function's name is used
-        as storage key. If `subject_labels` and `output` are True, the returned
-        data will be in dictionary format to keep track of subjects. If
-        `max_workers` is not provided, all CPU cores but 2 will be used in
-        parallel.
+        Subject in the Cohort and (optionally) stores the result in the
+        Subject's `quantities` dictionary. If no `key` is provided, the
+        function's name is used as storage key. If `max_workers` is not
+        provided, all CPU cores but 2 will be used in parallel.
 
         Any remaining keyword arguments will be passed as is to `quantity()`.
 
         Args:
             quantity (Callable[[SubjectT], Any]):
                 A function that takes a Subject and returns a computed value.
-            output (bool):
-                Whether to return results instead of storing them.
             key (Optional[str]):
                 Override key name under which quantity will be stored.
-            subject_labels (bool):
-                Whether to return `(subject.label, value)` tuples or just values.
+            store (bool):
+                Whether to store result in addition to returning it.
             max_workers (Optional[int]):
                 Maximum number of processes to spawn in parallel.
             **kwargs (Mapping[str, Any]):
                 Variable named arguments passed as `quantity(subject, **kwargs)`
 
         Returns:
-            Union[None, Union[Set[Any], Dict[str, Any]]]
-                None: Results are stored in Subject.quantities['quantity'].
+            Union[Set[Any], Dict[str, Any]]:
                 Set[Any]: Returns a set with results.
                 Dict[str, Any]: Returns a dict indexed by subject labels.
 
         Example:
             >>> from math import floor
-            >>> cohort = Cohort([Subject('Álvaro', demographics={'age': 30}),
+            >>> cohort = Cohort([Subject('Álvaro', demographics={'age': 31}),
             ...                   Subject('Beatriz', demographics={'age': 12})])
             >>> def decades(subject, round=False):
             ...     if round:
             ...         return floor(subject.demographics['age'] / 10)
             ...     return subject.demographics['age'] / 10
-            >>> cohort.compute(decades)
+            >>> r = cohort.compute(decades)
+            >>> r == {'Álvaro': 3.1, 'Beatriz': 1.2}
+            True
+            >>> cohort.compute(decades, store=True)
             >>> print(cohort['Beatriz'].quantities['decades'])
-            1
-            >>> cohort.compute(decades, output=True) == {3, 1}
-            True
-            >>> cohort.compute(decades, output=True, subject_labels=True)
-            {'Álvaro': 3, 'Beatriz': 1}
-            >>> cohort.compute(decades, output=False, key='mykey')
+            1.2
+            >>> r = cohort.compute(decades, key='mykey')
             >>> print(cohort['Beatriz'].quantities['mykey'])
-            1
-            >>> cohort.compute(decades, output=True, round=True)  == {3.0, 1.2}
-            True
+            1.2
+            >>> r = cohort.compute(decades, round=True)
+            r == {'Álvaro': 3, 'Beatriz': 1}
+
         """
         if key is None:
             key = quantity.__name__
 
         if max_workers is None:
-            max_workers = max(1, (os.cpu_count() or 1) - 2)
-        if max_workers < 1:
-            max_workers = 1
+            max_workers = (os.cpu_count() or 1) - 2
+
+        max_workers = max(max_workers, 1)
 
         # Submit task for each Subject in parallel.
         with concurrent.futures.ProcessPoolExecutor(
@@ -520,7 +595,7 @@ class Cohort(set):
                 for subject in self
             }
 
-            results = set()
+            results = {}
             for future in tqdm(
                     concurrent.futures.as_completed(futures_to_subjects),
                     total=len(futures_to_subjects),
@@ -528,14 +603,9 @@ class Cohort(set):
                 subject = futures_to_subjects[future]
                 result = future.result()
 
-                if output:
-                    results.add(
-                        (subject.label, result) if subject_labels else result
-                    )
-                else:
+                if store:
                     subject.quantities[key] = result
 
-            if output:
-                if subject_labels:
-                    return dict(results)
-                return results
+                results[subject.label] = result
+
+            return results

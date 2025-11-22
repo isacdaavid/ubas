@@ -5,7 +5,7 @@ Class to represent individual participants.
 import re
 from types import SimpleNamespace
 from typing import (
-    Any, Callable, Dict, Iterable, Mapping, Optional, TypeVar, Union
+    Any, Callable, Iterable, Mapping, Optional, TypeVar, Union
 )
 
 from .connectivity import FunctionalConnectivity, StructuralConnectivity
@@ -110,6 +110,25 @@ class Subject:
             for atlas in atlases
         }
 
+    def _tokenize_attr(
+            self,
+            attr_name: str
+    ) -> list[Union[str, list[str]]]:
+        """Helper method to tokenize an attribute path.
+
+        Args:
+            attr_name (str):
+                The path to the attribute or dictionary value.
+
+        Returns:
+            list[Union[str, list[str]]]:
+                The list of tokens to traverse. Nested lists encode dict keys.
+        """
+        # Split attr_name, both identifiers (left) and brackets (right).
+        regex = r"([a-zA-Z_]\w*)|\[([a-zA-Z_]\w*)\]"
+        tokens = re.findall(regex, attr_name)
+        return [token[0] or [token[1]] for token in tokens]
+
     def collect(
         self,
         attr_name: str,
@@ -139,48 +158,88 @@ class Subject:
             >>> sub.collect("EEG", default=0)
             0
         """
-        # Split attr_name, handling both identifiers (left) and brackets (right).
-        regex = r"([a-zA-Z_]\w*)|\[([a-zA-Z_]\w*)\]"
-        parts = re.findall(regex, attr_name)
-        parts = [part[0] or [part[1]] for part in parts]
+        tokens = self._tokenize_attr(attr_name)
 
         try:
             value = self
-            for part in parts:
-                if isinstance(part, list):
+            for token in tokens:
+                if isinstance(token, list):
                     # Dictionary key access
-                    value = value[part[0]]
+                    value = value[token[0]]
                 else:
                     # Attribute access
-                    value = getattr(value, part)
+                    value = getattr(value, token)
 
             return value
 
         except (AttributeError, KeyError, TypeError):
             return default
 
+    def store(self, attr_name: str, value: Any) -> None:
+        """Stores a value in a specific attribute of Subject.
+
+        Nested attributes can be stored using dot notation
+        (e.g. "connectivity.functional"), unquoted dictionary keys
+        (e.g. "quantities[fcs]"), or both.
+
+        Args:
+            attr_name (str):
+                The path to the attribute or dictionary value to modify.
+            value (Any):
+                The value to store.
+
+        Example:
+            >>> sub = Subject('Álvaro', demographics={'age': 30})
+            >>> sub.store("demographics[age]", 31)
+            >>> sub.demographics[age]
+            31
+        """
+        tokens = self._tokenize_attr(attr_name)
+
+        obj = self
+        for token in tokens[:-1]:
+            if isinstance(token, list):
+                # Dictionary key access
+                obj = obj[token[0]]
+            else:
+                # Attribute access
+                obj = getattr(obj, token)
+
+        attr = tokens[-1]
+
+        if isinstance(attr, list):
+            obj[attr] = value
+        else:
+            setattr(obj, tokens[-1], value)
+
     def compute(
             self,
             quantity: Callable[[SubjectT], Any],
             key: Optional[str] = None,
-            output: bool = False,
+            store: bool = True,
             **kwargs: Mapping[str, Any],
-    ) -> Union[None, Any]:
+    ) -> Any:
         """Compute a quantity for this Subject and store the result.
 
         This method applies a user-provided function (quantity) to the Subject
         and stores the result in the `quantities` dictionary. If no key is
-        provided, the function's name is used as key.
+        provided, the function's name is used as storage key.
+
+        Any remaining keyword arguments will be passed as is to `quantity()`.
 
         Args:
             quantity (Callable[[SubjectT], Any]):
                 A function that takes a Subject and returns a computed value.
             key (Optional[str]):
                 Override key name under which quantity will be stored.
-            output (bool):
-                Whether to return result instead of storing it.
+            store (bool):
+                Whether to store result in addition to returning it.
             kwargs (Mapping[str, Any]):
                 Variable named arguments passed as `quantity(subject, **kwargs)`
+
+        Returns:
+            Any:
+                Result of computing the quantity for this Subject.
 
         Example:
         >>> from math import floor
@@ -196,10 +255,10 @@ class Subject:
 
         result = quantity(self, **kwargs)
 
-        if output:
-            return result
+        if store:
+            self.quantities[key] = result
 
-        self.quantities[key] = result
+        return result
 
     def __repr__(self):
         return f"Subject({self.label}, {self.demographics['diagnosis']})"
