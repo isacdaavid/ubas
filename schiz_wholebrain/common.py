@@ -227,8 +227,10 @@ class Collection(set):
             2
         """
         super().__init__(members)
+
         # Cached label->Member mapping for O(1) access.
         self._label_to_member = {member.label: member for member in self}
+
         # Populate wrapper attributes.
         for member in self:
             setattr(self, member.label, member)
@@ -420,7 +422,7 @@ class Collection(set):
             {'Álvaro': 0, 'Beatriz': 0}
         """
         for member in self:
-            value = super(Collection, member).collect(attr_name, default)
+            value = member.collect(attr_name, default)
             yield (member.label, value) if labels else value
 
     # TODO: parallelize?
@@ -501,7 +503,7 @@ class Collection(set):
         for label in set.intersection(provided_labels, self.labels):
             member = self[label]
             member_value = value[label] if labels else value
-            super(Collection, member).store(attr_name, member_value)
+            member.store(attr_name, member_value)
 
     def compute(
             self,

@@ -1,14 +1,16 @@
 """
-Class to represent individual participants.
+Subject module.
 """
 
 import re
 from types import SimpleNamespace
 from typing import (
-    Any, Callable, Iterable, Mapping, Optional, TypeVar, Union
+    Any, Callable, Iterable, Mapping, Optional, Sequence, TypeVar, Union
 )
 
+from .common import Collection, Member
 from .connectivity import FunctionalConnectivity, StructuralConnectivity
+from .session import Session
 
 # Type variable for Subject or its subclasses
 SubjectT = TypeVar('SubjectT', bound='Subject')
@@ -16,7 +18,29 @@ SubjectT = TypeVar('SubjectT', bound='Subject')
 T = TypeVar('T')
 
 
+class Subject2(Member, Collection):
+    """A class to hold and manage subject data from a BIDS data base."""
+    def __init__(
+            self,
+            label: str,
+            sessions: Optional[Sequence[Session]] = None,
+            demographics: Optional[Mapping] = None,
+    ):
+        super().__init__(label)
+        self._sessions = sessions
+        self._demographics = demographics
+
+    @property
+    def sessions(self):
+        return self._sessions
+
+    @property
+    def demographics(self):
+        return self._demographics
+
+
 class Subject:
+    """A class to hold and manage subject data from a BIDS data base."""
     def __init__(
             self,
             subject_label: str,
@@ -68,7 +92,14 @@ class Subject:
             setattr(self, 'connectivity_' + atlas, bundle)
 
     @property
-    def label(self):
+    def label(self) -> str:
+        """str: The identifier label for this Subject.
+
+        Example:
+        >>> sub = Subject('Álvaro')
+        >>> sub.label
+        'Álvaro'
+        """
         return self._label
 
     @property
@@ -191,7 +222,7 @@ class Subject:
         Example:
             >>> sub = Subject('Álvaro', demographics={'age': 30})
             >>> sub.store("demographics[age]", 31)
-            >>> sub.demographics[age]
+            >>> sub.demographics['age']
             31
         """
         tokens = self._tokenize_attr(attr_name)
