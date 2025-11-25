@@ -25,7 +25,7 @@ from tqdm import tqdm
 
 from .common import Collection, Member
 from .load import load_matlab
-from .subject import Subject, Subject2
+from .subject import Subject
 
 # Type variable for Subject or its subclasses
 SubjectT = TypeVar('SubjectT', bound=Subject)
@@ -33,10 +33,10 @@ SubjectT = TypeVar('SubjectT', bound=Subject)
 T = TypeVar('T')
 
 
-class Cohort2(Collection, Member):
+class Cohort(Collection, Member):
     """A specialized class to manage a cohort of Subjects."""
 
-    def __init__(self, subjects: Iterable[Subject2]):
+    def __init__(self, subjects: Iterable[Subject]):
         super().__init__(subjects)
 
     @classmethod
@@ -237,7 +237,7 @@ class Cohort2(Collection, Member):
             yield demographics
 
 
-class Cohort(set):
+class Cohort2(set):
     """A specialized set class to manage a cohort of Subjects in a study."""
 
     def __init__(self, subjects: Iterable[Subject]):

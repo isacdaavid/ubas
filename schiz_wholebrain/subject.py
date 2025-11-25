@@ -18,7 +18,7 @@ SubjectT = TypeVar('SubjectT', bound='Subject')
 T = TypeVar('T')
 
 
-class Subject2(Member, Collection):
+class Subject(Member, Collection):
     """A class to hold and manage subject data from a BIDS data base."""
     def __init__(
             self,
@@ -39,7 +39,7 @@ class Subject2(Member, Collection):
         return self._demographics
 
 
-class Subject:
+class Subjec2:
     """A class to hold and manage subject data from a BIDS data base."""
     def __init__(
             self,

@@ -15,6 +15,7 @@ except PackageNotFoundError:  # pragma: no cover
 finally:
     del version, PackageNotFoundError
 
-from .subject import Subject, Subject2
-from .cohort import Cohort, Cohort2
+from .common import Member, Collection
+from .cohort import Cohort
+from .subject import Subject
 from . import plot, quantities

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 import concurrent.futures
+import inspect
 import os
 import re
 from typing import (
@@ -67,7 +68,7 @@ class Member:
         return [token[0] or [token[1]] for token in tokens]
 
     # TODO: option to error on missing attribute.
-    def collect(
+    def collect_self(
         self,
         attr_name: str,
         default: Optional[T] = None,
@@ -113,7 +114,7 @@ class Member:
         except (AttributeError, KeyError, TypeError):
             return default
 
-    def store(self, attr_name: str, value: Any) -> None:
+    def store_self(self, attr_name: str, value: Any) -> None:
         """Stores a value in a specific attribute of Member.
 
         Nested attributes can be stored using dot notation (e.g. "ses-01.func"),
@@ -150,11 +151,12 @@ class Member:
         else:
             setattr(obj, tokens[-1], value)
 
-    def compute(
+    def compute_self(
             self,
             quantity: Callable[[Member], Any],
             key: Optional[str] = None,
             store: bool = True,
+            max_workers: Optional[int] = None,
             **kwargs: Mapping[str, Any],
     ) -> Any:
         """Compute a quantity for this Member and store the result.
@@ -188,6 +190,18 @@ class Member:
         >>> print(beatriz.quantities['decades'])
         1
         """
+        # quantity_type = inspect.signature(quantity).parameters.values()
+        # quantity_first_arg_type = list(quantity_type)[0].annotation
+
+        # if quantity_first_arg_type is not type(self):
+        #     return super(Member, self).compute(
+        #         quantity,
+        #         key=key,
+        #         store=store,
+        #         max_workers=max_workers,
+        #         **kwargs,
+        #     )
+
         if key is None:
             key = quantity.__name__
 
@@ -422,7 +436,7 @@ class Collection(set):
             {'Álvaro': 0, 'Beatriz': 0}
         """
         for member in self:
-            value = member.collect(attr_name, default)
+            value = member.collect_self(attr_name, default)
             yield (member.label, value) if labels else value
 
     # TODO: parallelize?
@@ -503,7 +517,7 @@ class Collection(set):
         for label in set.intersection(provided_labels, self.labels):
             member = self[label]
             member_value = value[label] if labels else value
-            member.store(attr_name, member_value)
+            member.store_self(attr_name, member_value)
 
     def compute(
             self,
