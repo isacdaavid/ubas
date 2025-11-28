@@ -18,4 +18,7 @@ finally:
 from .common import Member, Collection
 from .cohort import Cohort
 from .subject import Subject
+from .session import Session
+from .datatype import Datatype
+from .file import create
 from . import plot, quantities

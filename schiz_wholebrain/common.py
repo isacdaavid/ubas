@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 import concurrent.futures
-import inspect
 import os
 import re
 from typing import (
@@ -31,6 +30,12 @@ class Member:
     def __init__(self, label: str):
         self._label = label
         self._quantities = {}
+
+    def __reduce__(self):
+        return (type(self), (self._label,), self.__dict__)
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
 
     @property
     def label(self) -> str:
@@ -212,9 +217,6 @@ class Member:
 
         return result
 
-    def __repr__(self):
-        return f"{self.__class__.__name__}({self.label})"
-
     def __hash__(self):
         return hash(self.label)
 
@@ -245,9 +247,13 @@ class Collection(set):
         # Cached label->Member mapping for O(1) access.
         self._label_to_member = {member.label: member for member in self}
 
-        # Populate wrapper attributes.
-        for member in self:
-            setattr(self, member.label, member)
+    def __reduce__(self):
+        # Reconstruct with the current members
+        return (type(self), (list(self),), self.__dict__)
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self._label_to_member = {member.label: member for member in self}
 
     @property
     def labels(self) -> Set[str]:
@@ -284,7 +290,6 @@ class Collection(set):
         """
         super().add(member)
         self._label_to_member[member.label] = member
-        setattr(self, member.label, member)
 
     # TODO: atomic thread-safety
     def remove(self, member: Member) -> None:
@@ -311,9 +316,8 @@ class Collection(set):
             >>> print(len(cohort))
             1
         """
-        super().remove(member)
+        super().remove(self._label_to_member[member.label])
         del self._label_to_member[member.label]
-        delattr(self, member.label)
 
     # TODO: multi-member support.
     def __getitem__(self, index: str) -> Member:
@@ -395,7 +399,7 @@ class Collection(set):
             1
         """
         subcollection = filter(condition, self)
-        return type(self)(subcollection)
+        return type(self)(self.label, subcollection)
 
     # TODO: parallelize?
     # TODO: option to shortcircuit on Member fail.
@@ -490,7 +494,6 @@ class Collection(set):
             >>> r = cohort.collect("demographics[age]")
             >>> set(r) == {31, 13}
             True
-
         """
         # Validate input type.
         if labels and not isinstance(value, Mapping):
