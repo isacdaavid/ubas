@@ -104,7 +104,7 @@ class FileBIDS(Member, ABC):
         """Write data to the file."""
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self._filename})"
+        return f"{self.__class__.__name__}('{self._filename}')"
 
 
 class FileBVal(FileBIDS):

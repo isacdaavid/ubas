@@ -11,6 +11,7 @@ from typing import (
     Optional,
     Sequence,
     TypeVar,
+    Union,
 )
 
 from bids import BIDSLayout     # type: ignore
@@ -30,9 +31,18 @@ T = TypeVar('T')
 class Cohort(Member, Collection):
     """A specialized class to manage a cohort of Subjects."""
 
-    def __init__(self, label: str, subjects: Iterable[Subject]):
+    def __init__(
+            self,
+            label: str,
+            contents: Union[Iterable[Subject], BIDSLayout] = (),
+    ):
         super().__init__(label)
-        super(Member, self).__init__(subjects)
+
+        if isinstance(contents, BIDSLayout):
+            labels = contents.get(target='subject', return_type='id')
+            contents = [Subject(label, contents) for label in labels]
+
+        super(Member, self).__init__(contents)
 
     def __reduce__(self):
         return (type(self), (self.label, list(self)), self.__dict__)
@@ -238,4 +248,4 @@ class Cohort(Member, Collection):
             yield demographics
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.label}, {self.labels})"
+        return f"{self.__class__.__name__}('{self.label}', {self.labels})"

@@ -2,7 +2,9 @@
 Datatype module.
 """
 
-from typing import Iterable, Optional
+from typing import Iterable, Union
+
+from bids import BIDSLayout     # type: ignore
 
 from .common import Collection, Member
 from .file import FileBIDS
@@ -14,10 +16,29 @@ class Datatype(Member, Collection):
     def __init__(
             self,
             label: str,
-            files: Optional[Iterable[FileBIDS]],
+            contents: Union[Iterable[FileBIDS], BIDSLayout] = (),
+            subject_label: str = '',
+            session_label: str = '',
     ):
         super().__init__(label)
-        super(Member, self).__init__(files)
+
+        if isinstance(contents, BIDSLayout):
+            if session_label:
+                contents = contents.get(
+                    subject=subject_label,
+                    session=session_label,
+                    datatype=label,
+                )
+            else:
+                contents = contents.get(
+                    subject=subject_label,
+                    datatype=label,
+                )
+
+            for content in contents:
+                setattr(content, 'label', content.filename)
+
+        super(Member, self).__init__(contents)
 
     def __reduce__(self):
         return (type(self), (self.label, list(self)), self.__dict__)
@@ -26,4 +47,4 @@ class Datatype(Member, Collection):
         self.__dict__.update(state)
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.label}, {self.labels})"
+        return f"{self.__class__.__name__}('{self.label}', {self.labels})"
