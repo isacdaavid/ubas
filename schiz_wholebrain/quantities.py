@@ -5,6 +5,7 @@ Functions to compute measurements of interest on `Subject` data.
 from typing import Optional, Sequence, TypeVar
 
 from neurolib.models.aln import ALNModel
+from neurolib.models.hopf import HopfModel
 import numpy as np
 
 from .subject import Subject
@@ -56,6 +57,24 @@ def aln_functional_connectivity(
         )
 
     return np.corrcoef(time_series)
+
+
+def hopf_model(
+        subject: SubjectT,
+        mean_structural: bool = False,
+        duration: int = 300,
+) -> HopfModel:
+    structural = subject.structural_connectivity[ATLAS].raw_count
+    distances = subject.structural_connectivity[ATLAS].mean_length
+    structural_cortex = structural[CORTEX, CORTEX]
+    distances_cortex = distances[CORTEX, CORTEX]
+    model = HopfModel(Cmat=structural_cortex, Dmat=distances_cortex)
+    parameters = {
+        'duration': duration * 1000,
+    }
+    model.params.update(parameters)
+    model.run(chunkwise=True, chunksize=20000, bold=True)
+    return model
 
 
 def aln_model(
