@@ -12,7 +12,7 @@
 
 # UBAS
 
-> Unified BIDS Analysis Suite
+> Unified BIDS Analysis Scaler
 
 UBAS allows you to read and process BIDS datasets using modern,
 scalable and general-purpose declarative interfaces, so that you can
