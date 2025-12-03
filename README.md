@@ -14,48 +14,38 @@
 
 > Unified BIDS Analysis Scaler
 
-UBAS allows you to read and process BIDS datasets using modern,
-scalable and general-purpose declarative interfaces, so that you can
-concentrate on the neuroscience.
+Load and process BIDS datasets using modern, scalable and general-purpose
+declarative interfaces, so that you can concentrate on the neuroscience.
 
-The BIDS standard is being increasingly adopted to store and
-preprocess all sorts of neuroimaging data. However, flexible and
-efficient tools to help researchers implement their in-house studies
-starting from a BIDS folder are lacking. UBAS builds on PyBIDS, which
-provides primitives to load and traverse BIDS dataset metadata, and
-adds the capacity to represent and analyze the actual neuroimaging
-data in a dependable and transparent structure which mimics the BIDS
-hierarchy.
-
-Instead of shipping prefabricated analysis pipelines for common use cases (like
-Clinica), the UBAS philosophy fits with researchers who want control over their
-heterogeneous analyses, but do not want to waste time writing error-prone loops.
-It also appeals to researchers who would like to further standardize adoption of
-BIDS, while exploiting UBAS scalability capabilities as a computational engine.
+The UBAS philosophy fits well with researchers who want control over their
+heterogeneous analyses, but do not want to waste time writing slow and
+error-prone loops to load and manipulate the data. In fact, UBAS implements _no_
+neuroimaging analysis methods at all. Rather, it stands as an intermediary
+interface between the data and the methods, and aims for compatibility with
+existing algorithmic arsenals.
 
 ## Features
 
- - BIDS transparency: once loaded, UBAS objects follow the same
-   file system hierarchy: cohorts containing subjects, containing
-   sessions, containing modalities, containing files and metadata,
-   etc.
+ - **BIDS transparency**: UBAS objects follow the same intuitive hierarchy as
+   the BIDS data in the file system: cohorts containing subjects, containing
+   sessions, containing modalities, containing files and metadata, etc.
 
- - Lazy evaluation: Datasets can be huge. File contents are only
-   loaded to RAM when needed. An in-memory cache is
-   still provided to speed-up access to popular files.
+ - **Data parallelism**: computation is accelerated by default using proven
+   primitives from the big data field: collecting, storing, filtering and
+   processing in parallel is as easy as passing a custom function defined for
+   one element.
 
- - Parallel computing by default: accelerate the science with proven
-   functional programming primitives used in big data. Want to filter
-   your dataset or compute something on every member at certain level
-   of your BIDS hierarchy? It's as easy as passing your custom
-   function for one element. UBAS will automatically distribute the
-   computation to the whole dataset.
+ - **Memory efficient**: Achieved via lazy evaluation. File contents are only
+   loaded to RAM when needed. An in-memory cache is still provided to speed-up
+   access.
 
+ - **Seamless flexibility**: The same features are available across levels of
+   the tree structure, whether cohorts, subjects, sessions, etc.
 
 ## Installation
 
 ```{shell}
- git clone https://github.com/isacdaavid/schiz_wholebrain.git
+ git clone https://github.com/isacdaavid/ubas.git
 ```
 
 A conda environment is recommended. The repository is being developed
@@ -67,13 +57,13 @@ conda create --name myenv python=3.9
 conda activate myenv
 ```
 
-Make sure to install the dependencies listed in [setup.cfg](https://github.com/isacdaavid/schiz_wholebrain/blob/master/setup.cfg#L50):
+Make sure to install the dependencies listed in [setup.cfg](https://github.com/isacdaavid/ubas/blob/master/setup.cfg#L50):
 
 ```{shell}
-pip install numpy pybids scipy tqdm neurolib
+pip install ...
 ```
 
-If you wish to run the accompanying Jupyter [notebook](https://github.com/isacdaavid/schiz_wholebrain/blob/master/notebook.ipynb):
+If you wish to run the accompanying Jupyter [notebook](https://github.com/isacdaavid/ubas/blob/master/notebook.ipynb):
 ```{shell}
-pip install notebook matplotlib importlib
+pip install notebook matplotlib importlib neurolib
 ```
