@@ -12,12 +12,13 @@
 
 # UBAS
 
-> Unified BIDS Analysis Scaler
+> Unified BIDS Automation at Scale
 
-![](https://raw.githubusercontent.com/isacdaavid/ubas/refs/heads/master/data/ubas_logo.svg){height=50%}
+![](https://raw.githubusercontent.com/isacdaavid/ubas/refs/heads/master/data/ubas_logo.sv)g
 
-Load and process BIDS datasets using modern, scalable and general-purpose
-declarative interfaces, so that you can concentrate on the neuroscience.
+Load and process [BIDS](https://bids.neuroimaging.io/) datasets using modern,
+scalable and general-purpose declarative interfaces, so that you can concentrate
+on the neuroscience.
 
 The UBAS philosophy fits well with researchers who want control over their
 heterogeneous analyses, but do not want to waste time writing slow and
@@ -34,8 +35,7 @@ existing algorithmic arsenals.
 
  - **Data parallelism**: computation is accelerated by default using proven
    primitives from the big data field: collecting, storing, filtering and
-   processing in parallel is as easy as passing a custom function defined for
-   one element.
+   processing in parallel is as easy as defining how to do it for one element.
 
  - **Memory efficient**: Achieved via lazy evaluation. File contents are only
    loaded to RAM when needed. An in-memory cache is still provided to speed-up
