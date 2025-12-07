@@ -14,6 +14,8 @@
 
 > Unified BIDS Analysis Scaler
 
+![](https://raw.githubusercontent.com/isacdaavid/ubas/refs/heads/master/data/ubas_logo.svg)
+
 Load and process BIDS datasets using modern, scalable and general-purpose
 declarative interfaces, so that you can concentrate on the neuroscience.
 
