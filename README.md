@@ -14,7 +14,7 @@
 
 > Unified BIDS Automation at Scale
 
-![](https://raw.githubusercontent.com/isacdaavid/ubas/refs/heads/master/data/ubas_logo.sv)g
+![](https://raw.githubusercontent.com/isacdaavid/ubas/refs/heads/master/data/ubas_logo.sv)
 
 Load and process [BIDS](https://bids.neuroimaging.io/) datasets using modern,
 scalable and general-purpose declarative interfaces, so that you can concentrate
