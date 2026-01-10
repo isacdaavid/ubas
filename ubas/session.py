@@ -16,7 +16,7 @@ class Session(Member, Collection):
             contents: Union[Iterable[Datatype], BIDSLayout] = (),
             subject_label: str = '',
     ):
-        super().__init__(label)
+        Member.__init__(self, label)
 
         if isinstance(contents, BIDSLayout):
             labels = contents.get(
@@ -35,7 +35,7 @@ class Session(Member, Collection):
                 for label in labels
             ]
 
-        super(Member, self).__init__(contents)
+        Collection.__init__(self, contents)
 
     def __reduce__(self):
         return (type(self), (self.label, list(self)), self.__dict__)

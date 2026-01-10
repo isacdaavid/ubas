@@ -20,7 +20,7 @@ class Datatype(Member, Collection):
             subject_label: str = '',
             session_label: str = '',
     ):
-        super().__init__(label)
+        Member.__init__(self, label)
 
         if isinstance(contents, BIDSLayout):
             if session_label:
@@ -38,7 +38,7 @@ class Datatype(Member, Collection):
             for content in contents:
                 setattr(content, 'label', content.filename)
 
-        super(Member, self).__init__(contents)
+        Collection.__init__(self, contents)
 
     def __reduce__(self):
         return (type(self), (self.label, list(self)), self.__dict__)

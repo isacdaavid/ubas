@@ -19,10 +19,10 @@ class Subject(Member, Collection):
     def __init__(
             self,
             label: str,
-            contents: Union[Iterable[Session], Iterable[Datatype], BIDSLayout] = set(),
+            contents: Union[Iterable[Session], Iterable[Datatype], BIDSLayout] = (),
             demographics: Optional[Mapping] = None,
     ):
-        super().__init__(label)
+        Member.__init__(self, label)
 
         if isinstance(contents, BIDSLayout):
             labels = contents.get(
@@ -36,6 +36,7 @@ class Subject(Member, Collection):
                     for label in labels
                 ]
             else:
+                # Subject contains single tacit session. Jump to Datatype.
                 labels = contents.get(
                     subject=label,
                     target='datatype',
@@ -50,7 +51,7 @@ class Subject(Member, Collection):
                     for label in labels
                 ]
 
-        super(Member, self).__init__(contents)
+        Collection.__init__(self, contents)
         self._demographics = demographics
 
     def __reduce__(self):

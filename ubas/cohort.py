@@ -29,20 +29,20 @@ T = TypeVar('T')
 
 
 class Cohort(Member, Collection):
-    """A specialized class to manage a cohort of Subjects."""
+    """A class to represent a cohort subjects in a BIDS data set."""
 
     def __init__(
             self,
             label: str,
             contents: Union[Iterable[Subject], BIDSLayout] = (),
     ):
-        super().__init__(label)
+        Member.__init__(self, label)
 
         if isinstance(contents, BIDSLayout):
             labels = contents.get(target='subject', return_type='id')
             contents = [Subject(label, contents) for label in labels]
 
-        super(Member, self).__init__(contents)
+        Collection.__init__(self, contents)
 
     def __reduce__(self):
         return (type(self), (self.label, list(self)), self.__dict__)
