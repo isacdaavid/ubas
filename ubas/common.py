@@ -28,6 +28,12 @@ class Member:
     """An abstract class for member objects in a Collection."""
 
     def __init__(self, label: str):
+        if not isinstance(label, str):
+            raise TypeError('Label must be a string.')
+
+        if label == '':
+            raise ValueError('Label must not be empty.')
+
         self._label = label
         self._quantities = {}
 
@@ -74,9 +80,9 @@ class Member:
 
     # TODO: option to error on missing attribute.
     def collect_self(
-        self,
-        attr_name: str,
-        default: Optional[T] = None,
+            self,
+            attr_name: str,
+            default: Optional[T] = None,
     ) -> Any:
         """Extracts a specific attribute from Member.
 
