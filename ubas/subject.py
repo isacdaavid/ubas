@@ -1,7 +1,7 @@
 """Subject module."""
 
 from typing import (
-    Iterable, Mapping, Optional, TypeVar, Union
+    Any, Dict, Iterable, Mapping, Optional, TypeVar, Union
 )
 
 from bids import BIDSLayout     # type: ignore
@@ -67,6 +67,10 @@ class Subject(Member, Collection):
     @property
     def demographics(self):
         return self._demographics
+
+    @demographics.setter
+    def demographics(self, value: Dict[str, Any]) -> None:
+        self._demographics = value
 
     def __repr__(self) -> str:
         classname = self.__class__.__name__
