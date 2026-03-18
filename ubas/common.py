@@ -14,6 +14,7 @@ from typing import (
     Optional,
     Set,
     Tuple,
+    Type,
     TypeVar,
     Union,
 )
@@ -27,20 +28,16 @@ T = TypeVar('T')
 class Member:
     """An abstract class for member objects in a Collection."""
 
-    def __init__(self, label: str):
-        if not isinstance(label, str):
-            raise TypeError('Label must be a string.')
-
-        if label == '':
-            raise ValueError('Label must not be empty.')
-
-        self._label = label
+    def __init__(self, label: str) -> Member:
+        self.label = label
         self._quantities = {}
 
-    def __reduce__(self):
+    def __reduce__(self) -> Tuple[Type['Member'], Tuple[str], Mapping[str, Any]]:
+        """Serialize type callable and state (pickle protocol)."""
         return (type(self), (self._label,), self.__dict__)
 
-    def __setstate__(self, state):
+    def __setstate__(self, state: Mapping[str, Any]) -> None:
+        """Restore object state from a dictionary (pickle protocol)."""
         self.__dict__.update(state)
 
     @property
@@ -53,6 +50,16 @@ class Member:
         'Álvaro'
         """
         return self._label
+
+    @label.setter
+    def label(self, value: str) -> None:
+        if not isinstance(value, str):
+            raise TypeError('Label must be a string.')
+
+        if value == '':
+            raise ValueError('Label must not be empty.')
+
+        self._label = value
 
     @property
     def quantities(self):
@@ -223,13 +230,16 @@ class Member:
 
         return result
 
-    def __hash__(self):
-        return hash(self.label)
+    def __hash__(self) -> int:
+        return hash(
+            (type(self), self.label) +
+            tuple(hash(member) for member in self.members)
+        )
 
-    def __eq__(self, other):
-        if isinstance(other, type(self)):
-            return self.label == other.label
-        return False
+    def __eq__(self, other) -> bool:
+        if id(self) == id(other):
+            return True
+        return hash(self) == hash(other)
 
 
 class Collection(set):
@@ -274,7 +284,7 @@ class Collection(set):
         return {member.label for member in self}
 
     @property
-    def members(self) -> Dict[str, Member]:
+    def members(self) -> Set[Member]:
         return set(self._members.values())
 
     # TODO: atomic thread-safety
