@@ -596,7 +596,7 @@ class Collection(set):
             1.2
             >>> r = cohort.compute(decades, round=True)
             r == {'Álvaro': 3, 'Beatriz': 1}
-
+            True
         """
         if key is None:
             key = quantity.__name__
