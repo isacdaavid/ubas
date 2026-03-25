@@ -4,10 +4,16 @@ Classes to represent connectivity objects
 
 import glob
 
+from bids.layout.models import BIDSFile
 import numpy as np
+import scipy.io
 
-from .load import load_matlab, load_tsv
-
+def load_tsv(file_path):
+    """Load matrix in TSV format."""
+    data = np.loadtxt(file_path, delimiter='\t', dtype=str)
+    columns = tuple(data[0].tolist())
+    values = data[1:].astype(float)
+    return columns, values
 
 class Connectivity():
     def make_symmetrical(self, connectivity_matrix: str):
@@ -23,26 +29,14 @@ class Connectivity():
 
 
 class FunctionalConnectivity(Connectivity):
-    def __init__(
-            self,
-            derivatives: str,
-            subject: str,
-            session: str,
-            atlas: str,
-    ):
-        pattern = f'sub-{subject}/ses-{session}/func/sub-{subject}_ses-{session}_task-rest*_space-fsLR_seg-{atlas}Parcels_stat-mean_timeseries.tsv'
-
+    def __init__(self, time_series: BIDSFile, outliers: BIDSFile):
         try:
-            runs = glob.glob(f'{derivatives}/{pattern}')
-            self._region_labels, self._time_series = load_tsv(runs[0])
+            self._region_labels, self._time_series = load_tsv(time_series.path)
         except FileNotFoundError as error:
             print(error)
 
-        pattern = f'sub-{subject}/ses-{session}/func/sub-{subject}_ses-{session}_task-rest_*outliers.tsv'
-
         try:
-            runs = glob.glob(f'{derivatives}/{pattern}')
-            _, self._motion_outliers = load_tsv(runs[0])
+            _, self._motion_outliers = load_tsv(outliers.path)
         except FileNotFoundError as error:
             print(error)
 
@@ -68,17 +62,7 @@ class FunctionalConnectivity(Connectivity):
 
 
 class StructuralConnectivity(Connectivity):
-    def __init__(
-            self,
-            derivatives: str,
-            subject: str,
-            session: str,
-            atlas: str,
-    ):
-
-        pattern = f'{derivatives}/sub-{subject}/ses-{session}/dwi/sub-{subject}_ses-{session}_space-ACPC_connectivity.mat'
-        runs = glob.glob(pattern)
-
+    def __init__(self, connectivity_file: BIDSFile, atlas: str):
         keys = (
             f'atlas_{atlas}Parcels_region_ids',
             f'atlas_{atlas}Parcels_region_labels',
@@ -89,7 +73,10 @@ class StructuralConnectivity(Connectivity):
         )
 
         try:
-            data = tuple(load_matlab(runs[0])[key] for key in keys)
+            data = [
+                scipy.io.loadmat(connectivity_file.path)[key]
+                for key in keys
+            ]
         except FileNotFoundError as error:
             print(error)
 

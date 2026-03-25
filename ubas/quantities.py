@@ -1,5 +1,5 @@
 """
-Functions to compute measurements of interest on `Subject` data.
+Functions to compute measurements of interest on `Member` data.
 """
 
 from typing import Optional, Sequence, TypeVar
@@ -9,12 +9,65 @@ from neurolib.models.hopf import HopfModel
 import numpy as np
 
 from .subject import Subject
+from .connectivity import FunctionalConnectivity, StructuralConnectivity
 
 SubjectT = TypeVar('SubjectT', bound=Subject)
 
 # TODO: don't hardcode parameters. Receive and unpack variable args.
 ATLAS = '4S156'
 CORTEX = slice(0, 100)
+
+
+def structural_connectivity(
+        subject: SubjectT,
+        atlas: str = ATLAS
+) -> StructuralConnectivity:
+    session = subject.members.pop()
+    dwi = subject[session.label]['dwi']
+    file_pattern = 'connectivity.mat'
+    dwi = dwi.filter(lambda f: f.label.endswith(file_pattern))
+
+    connectivity_file = None
+
+    # Only take the first run, if many exist.
+    for f in dwi:
+        if 'run' not in f.entities or f.entities['run'] == '01':
+            connectivity_file = f
+            break
+
+    return StructuralConnectivity(connectivity_file, atlas)
+
+
+def functional_connectivity(
+        subject: SubjectT,
+        atlas: str = ATLAS
+) -> FunctionalConnectivity:
+    session = subject.members.pop()
+    func = subject[session.label]['func']
+    file_pattern = f'{atlas}Parcels_stat-mean_timeseries.tsv'
+    func = func.filter(lambda f: f.label.endswith(file_pattern))
+
+    connectivity_file = None
+
+    # Only take the first run, if many exist.
+    for f in func:
+        if 'run' not in f.entities or f.entities['run'] == '01':
+            connectivity_file = f
+            break
+
+    func = subject[session.label]['func']
+    file_pattern = f'_outliers.tsv'
+    func = func.filter(lambda f: f.label.endswith(file_pattern))
+
+    outliers_file = None
+
+    # Only take the first run, if many exist.
+    for f in func:
+        if 'run' not in f.entities or f.entities['run'] == '01':
+            outliers_file = f
+            break
+
+    return FunctionalConnectivity(connectivity_file, outliers_file)
 
 
 def aln_functional_connectivity(
@@ -102,12 +155,14 @@ def aln_model(
         ALNModel:
             An initialized and executed ALN model with simulation results.
     """
+    quantities = subject.quantities
+
     if mean_structural:
-        structural = subject.quantities['cohort_mean_raw_count']
-        distances = subject.quantities['cohort_mean_mean_length']
+        structural = quantities['cohort_mean_raw_count']
+        distances = quantities['cohort_mean_mean_length']
     else:
-        structural = subject.structural_connectivity[ATLAS].raw_count
-        distances = subject.structural_connectivity[ATLAS].mean_length
+        structural = quantities['structural_connectivity'].raw_count
+        distances = quantities['structural_connectivity'].mean_length
 
     structural_cortex = structural[CORTEX, CORTEX]
     distances_cortex = distances[CORTEX, CORTEX]
@@ -234,7 +289,8 @@ def connectivity_strength(
         np.ndarray:
             A 1-dimensional array with the connectivity strength of each node.
     """
-    correlation = subject.functional_connectivity[ATLAS].correlation_matrix
+    fc = subject.quantities['functional_connectivity']
+    correlation = fc.correlation_matrix
     correlation_cortex = correlation[CORTEX, CORTEX]
     fcs = correlation_cortex.mean(axis=0)
     if absolute:
@@ -264,7 +320,7 @@ def matrix2matrix_correlation(
         float:
             Pearson correlation.
     """
-    matrix1_cortex = subject.collect(matrix1)[CORTEX, CORTEX]
-    matrix2_cortex = subject.collect(matrix2)[CORTEX, CORTEX]
+    matrix1_cortex = subject.collect_self(matrix1)[CORTEX, CORTEX]
+    matrix2_cortex = subject.collect_self(matrix2)[CORTEX, CORTEX]
     correlation = np.corrcoef(matrix1_cortex.ravel(), matrix2_cortex.ravel())
     return float(correlation[0, 1])
