@@ -549,12 +549,13 @@ class Collection(set):
             store: bool = True,
             max_workers: Optional[int] = None,
             **kwargs: Mapping[str, Any],
-    ) -> Union[Set[Any], Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         """Apply a function to each Member in parallel.
 
         This method applies a user-provided function (`quantity`) to each Member
-        in the Collection and (optionally) stores the result in the Members'
-        `quantities` dictionary. If no `key` is provided, the function's name is
+        in the Collection. Results are returned as a dictionary indexed by
+        Member label, and also stored in each Member's `quantities` dictionary
+        (unless `store=False`). If no `key` is provided, the function's name is
         used as storage key. If `max_workers` is not provided, all CPU cores but
         2 will be used in parallel.
 
@@ -573,9 +574,7 @@ class Collection(set):
                 Variable named arguments passed as `quantity(member, **kwargs)`
 
         Returns:
-            Union[Set[Any], Dict[str, Any]]:
-                Set[Any]: Returns a set with results.
-                Dict[str, Any]: Returns a dict indexed by labels.
+            Dict[str, Any]: Returns a dict indexed by labels.
 
         Example:
             >>> from math import floor
