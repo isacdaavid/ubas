@@ -6,7 +6,7 @@ from collections import defaultdict
 from functools import wraps
 from math import floor
 from typing import (
-    Any, Callable, Iterable, Mapping, Optional, Sequence, Union
+    Any, Callable, Iterable, Mapping, Optional, Sequence, Tuple, Union
 )
 
 import matplotlib
@@ -84,8 +84,8 @@ def min_alpha(
 
 
 def plottify(
-        func: Callable[..., tuple[plt.Figure, plt.Axes]],
-) -> Callable[..., Union[tuple[plt.Figure, plt.Axes], None]]:
+        func: Callable[..., Tuple[plt.Figure, plt.Axes]],
+) -> Callable[..., Union[Tuple[plt.Figure, plt.Axes], None]]:
     """Decorator to add routine properties and behaviors to plotting functions.
 
     Args:
@@ -103,19 +103,19 @@ def plottify(
     Returns:
         None:
             Display plot as side effect.
-        tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]:
+        Tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]:
             Return plot and axes objects.
     """
     @wraps(func)
     def wrapper(
             *args,
             title: str = "",
-            figsize: Optional[tuple[float, float]] = None,
+            figsize: Optional[Tuple[float, float]] = None,
             axislabels: Sequence[str] = ("", "", ""),
             fontsize: float = FONTSIZE,
             output: bool = False,
             **kwargs: Mapping[str, Any],
-    ) -> Union[None, tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]]:
+    ) -> Union[None, Tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]]:
         # Call the actual plotting function.
         fig, ax = func(*args, fontsize=fontsize, **kwargs)
 
@@ -147,19 +147,22 @@ def plottify(
 
 
 @plottify
-def connectivity(
+def heatmap(
         matrix: np.ndarray,
-        labels: Sequence[str] = (),
+        xticklabels: Sequence[str] = (),
+        yticklabels: Sequence[str] = (),
         colorbar: bool = True,
         fontsize: float = FONTSIZE,
-) -> tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]:
-    """Visualize a connectivity matrix as a heatmap.
+) -> Tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]:
+    """Visualize a matrix as a heatmap.
 
     Args:
         matrix (np.ndarray):
             numerical 2D numpy array to visualize.
-        labels (Sequence[str]):
-            Labels for the x and y axes (brain regions).
+        xticklabels (Sequence[str]):
+            Labels for the x axes.
+        yticklabels (Sequence[str]):
+            Labels for the y axes.
         colorbar (bool):
             Whether to display a color bar.
         Plus everything listed in `help(plot.plottify)`.
@@ -173,20 +176,22 @@ def connectivity(
         TypeError:
             If matrix is not numerical.
     """
-    if matrix.ndim != 2 or matrix.shape[0] != matrix.shape[1]:
-        raise ValueError("Input matrix must be 2D and square.")
-    if labels and len(labels) != matrix.shape[0]:
-        raise ValueError("Wrong number of labels.")
+    if matrix.ndim != 2:
+        raise ValueError("Input array must be 2-dimensional.")
+    if xticklabels and len(xticklabels) != matrix.shape[1]:
+        raise ValueError("Wrong number of xticklabels.")
+    if yticklabels and len(yticklabels) != matrix.shape[0]:
+        raise ValueError("Wrong number of yticklabels.")
     if not np.issubdtype(matrix.dtype, np.number):
         raise TypeError("Only numerical values are supported.")
 
     fig, ax = plt.subplots()
     im = ax.imshow(matrix)
 
-    ax.set_xticks(range(len(labels)))
-    ax.set_xticklabels(labels, rotation='vertical', fontsize=0.2 * fontsize)
-    ax.set_yticks(range(len(labels)))
-    ax.set_yticklabels(labels, fontsize=0.2 * fontsize)
+    ax.set_xticks(range(len(xticklabels)))
+    ax.set_xticklabels(xticklabels, rotation='vertical', fontsize=0.2 * fontsize)
+    ax.set_yticks(range(len(yticklabels)))
+    ax.set_yticklabels(yticklabels, fontsize=0.2 * fontsize)
 
     if colorbar:
         cbar = plt.colorbar(im, ax=ax)
@@ -201,7 +206,7 @@ def distribution(
         bins: int = 10,
         density: bool = True,
         fontsize: float = FONTSIZE,
-) -> tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]:
+) -> Tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]:
     """
     Args:
         distributions (Mapping[str, Sequence[float]]):
@@ -239,7 +244,7 @@ def repeated_measures(
         subject_colors: Optional[Mapping[str, str]] = None,
         subject_groups: Optional[Mapping[str, str]] = None,
         fontsize: float = FONTSIZE,
-) -> tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]:
+) -> Tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]:
     """
     Plot repeated measures as bars (mean ± std) and individual time series.
 
@@ -298,7 +303,7 @@ def repeated_measures(
 def scatter(
         groups: Mapping[str, Iterable[float]],
         fontsize: float = FONTSIZE,
-) -> tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]:
+) -> Tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]:
     """
     Args:
         groups (Mapping[str, Iterable[float]]):
@@ -325,18 +330,18 @@ def scatter(
 
 
 def compose(
-    plots: Sequence[tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]],
+    plots: Sequence[Tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]],
     shape: Sequence[int] = (1, 1),
     title: str = "",
-    figsize: Optional[tuple[float, float]] = None,
+    figsize: Optional[Tuple[float, float]] = None,
     fontsize: float = FONTSIZE,
     output: bool = False,
-) -> Union[None, tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]]:
+) -> Union[None, Tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]]:
     """
     Arrange a list of subplots in a grid.
 
     Args:
-        plots (Sequence[tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]]):
+        plots (Sequence[Tuple[matplotlib.pyplot.Figure, matplotlib.pyplot.Axes]]):
             List of (figure, axis) tuples.
         shape (Sequence(int)):
             Shape of the grid (rows, columns).
