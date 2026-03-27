@@ -98,7 +98,6 @@ class StructuralConnectivity(Connectivity):
     @property
     def mean_length(self):
         matrix = self.make_symmetrical('_mean_length')
-        np.fill_diagonal(matrix, 0)
         # Don't normalize distances, only average with transpose to
         # make symmetrical. Some model parameters are unit-sensitive.
         return matrix / 2
@@ -106,17 +105,14 @@ class StructuralConnectivity(Connectivity):
     @property
     def raw_count(self):
         matrix = self.make_symmetrical('_raw_count')
-        np.fill_diagonal(matrix, 0)
-        return matrix / matrix.max()
+        return matrix
 
     @property
     def sift_count(self):
         matrix = self.make_symmetrical('_sift_count')
-        np.fill_diagonal(matrix, 0)
-        return matrix / matrix.max()
+        return matrix
 
     @property
     def weighted_sift_count(self):
         matrix = self.make_symmetrical('_weighted_sift_count')
-        np.fill_diagonal(matrix, 0)
-        return matrix / matrix.max()
+        return matrix
