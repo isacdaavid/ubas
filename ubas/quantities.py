@@ -2,7 +2,7 @@
 Functions to compute measurements of interest on `Member` data.
 """
 
-from typing import Optional, Sequence, TypeVar
+from typing import Optional, Sequence, TypeVar, Tuple
 
 from neurolib.models.aln import ALNModel
 from neurolib.models.hopf import HopfModel
@@ -70,14 +70,14 @@ def functional_connectivity(
     return FunctionalConnectivity(connectivity_file, outliers_file)
 
 
-def aln_functional_connectivity(
+def sim_functional_connectivity(
         subject: SubjectT,
         transient: int = 0,
-        model_key: str = 'aln_model',
+        model_key: str = '',
         bandpass: Optional[Sequence[float]] = None,
         sampling_rate: Optional[float] = None,
 ) -> np.ndarray:
-    """Obtain functional connectivity matrix from BOLD simulation in ALN model.
+    """Obtain functional connectivity matrix from BOLD simulation in model.
 
     Args:
         subject (SubjectT):
@@ -85,7 +85,7 @@ def aln_functional_connectivity(
         transient (int):
             Duration of transient dynamics to be discard from data, in seconds.
         model_key (str):
-            Custom name under which the ALN model should be retrieved.
+            Custom name under which the model should be retrieved.
         bandpass (Optional[Sequence[float]]):
             Filter frequency content of BOLD time series to (min Hz, max Hz).
         sampling_rate (Optional[float]):
@@ -104,7 +104,10 @@ def aln_functional_connectivity(
 
     time_series = time_series[:, transient:]
 
-    if bandpass is not None and sampling_rate is not None:
+    if bandpass is not None:
+        if sampling_rate is None:
+            raise ValueError("Missing `sampling_rate` for `bandpass`.")
+
         time_series = bandpass_filter(
             time_series, sampling_rate, bandpass[0], bandpass[1]
         )
@@ -112,19 +115,55 @@ def aln_functional_connectivity(
     return np.corrcoef(time_series)
 
 
+def _get_structural(
+        subject: SubjectT,
+        mean_structural: bool,
+) -> Tuple[np.ndarray, np.ndarray]:
+    quantities = subject.quantities
+
+    if mean_structural:
+        C = quantities['cohort_mean_raw_count']
+        D = quantities['cohort_mean_mean_length']
+    else:
+        C = quantities['structural_connectivity'].raw_count
+        D = quantities['structural_connectivity'].mean_length
+
+    C_cortex = C[CORTEX, CORTEX]
+    D_cortex = D[CORTEX, CORTEX]
+
+    np.fill_diagonal(C_cortex, 0)
+    np.fill_diagonal(D_cortex, 0)
+
+    C_cortex_norm = C_cortex / np.linalg.norm(C_cortex, ord=2)
+    D_cortex_norm = D_cortex / np.linalg.norm(D_cortex, ord=2)
+
+    return C_cortex_norm, D_cortex_norm
+
+
 def hopf_model(
         subject: SubjectT,
         mean_structural: bool = False,
         duration: int = 300,
 ) -> HopfModel:
-    structural = subject.structural_connectivity[ATLAS].raw_count
-    distances = subject.structural_connectivity[ATLAS].mean_length
-    structural_cortex = structural[CORTEX, CORTEX]
-    distances_cortex = distances[CORTEX, CORTEX]
-    model = HopfModel(Cmat=structural_cortex, Dmat=distances_cortex)
+    structural, distances = _get_structural(subject, mean_structural)
+
+    model = HopfModel(Cmat=structural, Dmat=distances)
+
     parameters = {
-        'duration': duration * 1000,
+        'duration': duration * 1000,  # 5 min x 60 s x 1000 ms.
+        # Global parameters.
+        'signalV': 20,  # [20 m/s] global signal speed.
+        'K_gl': 1,    # [0.6] global coupling between nodes.
+        # Local parameters.
+        'a': -0.4,                # [0.25] a in Hopf bifurcation (a+iw)z.
+        'w': 0.2,                 # [0.2] Hopf oscillator freq. (a+iw)z.
+        # Ornstein-Uhlenbeck noise (brownian walk + mean drift + mean reversion).
+        'tau_ou': 5.0,            # [5.0 ms]
+        'sigma_ou': 0.0,          # [0.0] std. dev.
+        'x_ou_mean': 0.0,         # [0.0 mV/ms]
+        'y_ou_mean': 0.0,         # [0.0 mV/ms]
     }
+
     model.params.update(parameters)
     model.run(chunkwise=True, chunksize=20000, bold=True)
     return model
@@ -155,23 +194,13 @@ def aln_model(
         ALNModel:
             An initialized and executed ALN model with simulation results.
     """
-    quantities = subject.quantities
+    structural, distances = _get_structural(subject, mean_structural)
 
-    if mean_structural:
-        structural = quantities['cohort_mean_raw_count']
-        distances = quantities['cohort_mean_mean_length']
-    else:
-        structural = quantities['structural_connectivity'].raw_count
-        distances = quantities['structural_connectivity'].mean_length
-
-    structural_cortex = structural[CORTEX, CORTEX]
-    distances_cortex = distances[CORTEX, CORTEX]
-
-    model = ALNModel(Cmat=structural_cortex, Dmat=distances_cortex)
+    model = ALNModel(Cmat=structural, Dmat=distances)
     # Default values between brackets.
     parameters = {
         'duration': duration * 1000,  # 5 min x 60 s x 1000 ms.
-        # Global constants.
+        # Global parameters.
         'signalV': 20,  # [20 m/s] global signal speed.
         'c_gl': 0.3,    # [0.3] global current?
         'Ke_gl': 300,   # [250] global coupling between E populations.
