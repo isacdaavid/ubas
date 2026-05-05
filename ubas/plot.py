@@ -262,6 +262,7 @@ def repeated_measures(
     """
     fig, ax = plt.subplots()
     # Plot bars with mean and std error for each measurement.
+
     for i, measure in enumerate(measures):
         values = np.array(
             [x if x is not None else np.nan for x in measures[measure].values()]
@@ -326,6 +327,26 @@ def scatter(
         fontsize=fontsize,
     )
     plt.xlim(-0.5, len(groups) - 0.5)
+    return fig, ax
+
+
+@plottify
+def time_series(
+        data,
+        group_colors,
+        fontsize: float = FONTSIZE,
+):
+    fig, ax = plt.subplots()
+    for group, time_series in data.items():
+        color = group_colors[group]
+        # Plot each subject's time series
+        for key, values in time_series.items():
+            ax.plot(values, '-', alpha=0.5, color=color)
+
+    ax.grid(True, linestyle='--', alpha=0.5)
+    ax.legend()
+    plt.tight_layout()
+
     return fig, ax
 
 
