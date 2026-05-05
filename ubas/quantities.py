@@ -2,7 +2,8 @@
 Functions to compute measurements of interest on `Member` data.
 """
 
-from typing import Optional, Sequence, TypeVar, Tuple
+from typing import Mapping, Optional, Sequence, TypeVar, Tuple
+from math import floor
 
 from neurolib.models.aln import ALNModel
 from neurolib.models.hopf import HopfModel
@@ -70,46 +71,47 @@ def functional_connectivity(
     return FunctionalConnectivity(connectivity_file, outliers_file)
 
 
-def sim_functional_connectivity(
+def simulation_functional_connectivity(
         subject: SubjectT,
-        transient: int = 0,
-        model_key: str = '',
+        *,
+        simulation_key: str,
+        sampling_period: float,
+        transient: Optional[int] = 0,
         bandpass: Optional[Sequence[float]] = None,
-        sampling_rate: Optional[float] = None,
 ) -> np.ndarray:
-    """Obtain functional connectivity matrix from BOLD simulation in model.
+    """Obtain functional connectivity matrix from BOLD simulation.
 
     Args:
         subject (SubjectT):
-            Subject containing ALN model results.
-        transient (int):
+            Subject containing whole-brain model simulation.
+        simulation_key (str):
+            Custom name under which the simulation should be retrieved.
+        sampling_period (float):
+            Sampling period in seconds.
+        transient (Optional[int]):
             Duration of transient dynamics to be discard from data, in seconds.
-        model_key (str):
-            Custom name under which the model should be retrieved.
         bandpass (Optional[Sequence[float]]):
             Filter frequency content of BOLD time series to (min Hz, max Hz).
-        sampling_rate (Optional[float]):
-            Sampling frequency in Hz.
 
     Returns:
         np.ndarray:
             Pearson correlation matrix.
     """
-    time_series = subject.quantities[model_key].BOLD.BOLD
+    time_series = subject.quantities[simulation_key].BOLD.BOLD
 
-    if transient < 0 or transient >= time_series.shape[1]:
+    if transient < 0 or transient >= time_series.shape[1] * sampling_period:
         raise ValueError(
             f"transient must be between 0 and {time_series.shape[1] - 1}."
         )
 
-    time_series = time_series[:, transient:]
+    time_series = time_series[:, floor(transient / sampling_period):]
 
     if bandpass is not None:
-        if sampling_rate is None:
-            raise ValueError("Missing `sampling_rate` for `bandpass`.")
+        if sampling_period is None:
+            raise ValueError("Missing `sampling_period` for `bandpass`.")
 
         time_series = bandpass_filter(
-            time_series, sampling_rate, bandpass[0], bandpass[1]
+            time_series, sampling_period, bandpass[0], bandpass[1]
         )
 
     return np.corrcoef(time_series)
@@ -120,7 +122,6 @@ def _get_structural(
         mean_structural: bool,
 ) -> Tuple[np.ndarray, np.ndarray]:
     quantities = subject.quantities
-
     if mean_structural:
         C = quantities['cohort_mean_raw_count']
         D = quantities['cohort_mean_mean_length']
@@ -132,36 +133,41 @@ def _get_structural(
     D_cortex = D[CORTEX, CORTEX]
 
     np.fill_diagonal(C_cortex, 0)
-    np.fill_diagonal(D_cortex, 0)
 
     C_cortex_norm = C_cortex / np.linalg.norm(C_cortex, ord=2)
-    D_cortex_norm = D_cortex / np.linalg.norm(D_cortex, ord=2)
 
-    return C_cortex_norm, D_cortex_norm
+    return C_cortex_norm, D_cortex
 
-
+# a=-.5, g=1, w=10, sigma=.01
 def hopf_model(
         subject: SubjectT,
-        mean_structural: bool = False,
-        duration: int = 300,
+        *,
+        mean_structural: Optional[bool] = False,
+        duration: Optional[int] = 5 * 60,
+        cohort_params: Optional[Mapping] = None,
+        **model_params,
 ) -> HopfModel:
     structural, distances = _get_structural(subject, mean_structural)
-
     model = HopfModel(Cmat=structural, Dmat=distances)
+
+    if cohort_params is not None:
+        # Extract parameters for this subject.
+        model_params = cohort_params[subject.label]
 
     parameters = {
         'duration': duration * 1000,  # 5 min x 60 s x 1000 ms.
         # Global parameters.
         'signalV': 20,  # [20 m/s] global signal speed.
-        'K_gl': 1,    # [0.6] global coupling between nodes.
+        'K_gl': 0.6,    # [0.6] global coupling between nodes.
         # Local parameters.
-        'a': -0.4,                # [0.25] a in Hopf bifurcation (a+iw)z.
-        'w': 0.2,                 # [0.2] Hopf oscillator freq. (a+iw)z.
+        'a': -0.02,               # [0.25] a in Hopf bifurcation (a+iw)z.
+        'w': 0.13,                # [0.2 rad/s] Hopf oscillator freq. (a+iw)z.
         # Ornstein-Uhlenbeck noise (brownian walk + mean drift + mean reversion).
         'tau_ou': 5.0,            # [5.0 ms]
-        'sigma_ou': 0.0,          # [0.0] std. dev.
+        'sigma_ou': 0.01,         # [0.0] std. dev.
         'x_ou_mean': 0.0,         # [0.0 mV/ms]
         'y_ou_mean': 0.0,         # [0.0 mV/ms]
+        **model_params,           # override defaults with user input.
     }
 
     model.params.update(parameters)
@@ -171,8 +177,10 @@ def hopf_model(
 
 def aln_model(
         subject: SubjectT,
-        mean_structural: bool = False,
-        duration: int = 300,
+        *,
+        mean_structural: Optional[bool] = False,
+        duration: Optional[int] = 300,
+        **model_params,
 ) -> ALNModel:
     """Simulation of Adaptive Linear-Nonlinear neural mass model.
 
@@ -250,6 +258,7 @@ def aln_model(
         # Ornstein-Uhlenbeck noise (brownian walk + mean drift + mean reversion).
         'tau_ou': 5.0,            # [5.0 ms]
         'sigma_ou': 0.19,         # [0] std. dev.
+        **model_params,           # override defaults with user input.
     }
 
     model.params.update(parameters)
@@ -259,7 +268,7 @@ def aln_model(
 
 def bandpass_filter(
     data: np.ndarray,
-    sampling_rate: float,
+    sampling_period: float,
     low_freq: float,
     high_freq: float,
 ) -> np.ndarray:
@@ -269,8 +278,8 @@ def bandpass_filter(
     Args:
         data (np.ndarray):
             2D array of shape (n_signals, n_samples).
-        sampling_rate (float):
-            Sampling frequency in Hz.
+        sampling_period (float):
+            Sampling period in seconds.
         low_freq (float):
             Low cutoff frequency in Hz.
         high_freq (float):
@@ -284,7 +293,7 @@ def bandpass_filter(
     filtered_data = np.zeros_like(data)
 
     # Frequency axis
-    freqs = np.fft.fftfreq(n_samples, d=1/sampling_rate)
+    freqs = np.fft.fftfreq(n_samples, d=sampling_period)
 
     for i in range(n_signals):
         # FFT of the signal
@@ -301,7 +310,8 @@ def bandpass_filter(
 
 def connectivity_strength(
         subject: SubjectT,
-        absolute=True,
+        *
+        absolute: bool,
 ) -> np.ndarray:
     """Connectivity Strength (Global Brain Connectivity) of connectivity matrix.
 
@@ -331,8 +341,9 @@ def connectivity_strength(
 
 def matrix2matrix_correlation(
         subject: SubjectT,
-        matrix1: str = "",
-        matrix2: str = "",
+        *,
+        matrix1: str,
+        matrix2: str,
 ) -> float:
     """
     Pearson correlation between two connectivity matrices in a Subject.
