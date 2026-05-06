@@ -263,11 +263,25 @@ def repeated_measures(
     fig, ax = plt.subplots()
     # Plot bars with mean and std error for each measurement.
 
+    bar_color = 'black'
+
+    if isinstance(subject_colors, Mapping):
+        unique_colors = set(subject_colors.values())
+
+        if len(unique_colors) == 1:
+            bar_color = unique_colors.pop()
+
     for i, measure in enumerate(measures):
         values = np.array(
             [x if x is not None else np.nan for x in measures[measure].values()]
         )
-        ax.bar(i, np.nanmean(values), yerr=np.nanstd(values), color='gray')
+        ax.bar(
+            i,
+            np.nanmean(values),
+            yerr=np.nanstd(values),
+            color=bar_color,
+            alpha=0.5,
+        )
 
     # Gather time series for each unique Subject key across measurements.
     time_series = defaultdict(list)
@@ -281,8 +295,16 @@ def repeated_measures(
     unique_labels = {}
     alpha = min_alpha(len(time_series))
     for subject_label, series in time_series.items():
-        color = subject_colors.get(subject_label, 'k') if subject_colors else 'k'
-        label = subject_groups.get(subject_label, '') if subject_groups else None
+        color = (
+            subject_colors.get(subject_label, 'k')
+            if subject_colors
+            else 'k'
+        )
+        label = (
+            subject_groups.get(subject_label, '')
+            if subject_groups
+            else None
+        )
         line, = ax.plot(series, color=color, alpha=alpha)
 
         if label and label not in unique_labels:
@@ -293,7 +315,7 @@ def repeated_measures(
         ax.legend(
             unique_labels.values(),
             unique_labels.keys(),
-            fontsize=fontsize
+            fontsize=fontsize,
         )
 
     ax.set_xticks(range(len(measures)), measures)
