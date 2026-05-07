@@ -355,15 +355,31 @@ def scatter(
 @plottify
 def time_series(
         data,
-        group_colors,
+        group_colors: Optional[Mapping[str, str]] = None,
         fontsize: float = FONTSIZE,
 ):
     fig, ax = plt.subplots()
     for group, time_series in data.items():
-        color = group_colors[group]
+        alpha = min_alpha(len(time_series))
+
+        if group_colors is not None:
+            color = group_colors[group]
+
         # Plot each subject's time series
         for key, values in time_series.items():
-            ax.plot(values, '-', alpha=0.5, color=color)
+            if len(values) == 2 and isinstance(values[0], Sequence):
+                # Both x and y have been specified.
+                x_y_pairs = np.array([values[0], values[1]])
+                # Order by x to allow for interpolation.
+                x_y_pairs = x_y_pairs[:, np.argsort(x_y_pairs[0])]
+                ax.plot(
+                    x_y_pairs[0],
+                    x_y_pairs[1],
+                    alpha=alpha,
+                )
+            else:
+                # Implicit x values.
+                ax.plot(values, '-', alpha=alpha, color=color)
 
     ax.grid(True, linestyle='--', alpha=0.5)
     ax.legend()
