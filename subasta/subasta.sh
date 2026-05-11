@@ -441,7 +441,7 @@ main() {
         fi
 
         # Otherwise, run workflow til successful or til attempts are depleted.
-        process_subject "$sub"
+        process_subject "$sub" &
 
         # Limit number of subjects processed in parallel in the background.
         if [[ $(jobs -r -p | wc -l) -ge $PARALLEL_SUBJECTS ]]
