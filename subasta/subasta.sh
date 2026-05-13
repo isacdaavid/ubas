@@ -193,13 +193,13 @@ validate_directory() {
 
     if [[ ! -f "${DIR}/bids/dataset_description.json" ]]
     then
-        printf 'Error: missing %s/bids/dataset_description.json\n' "$DIR" >%2
+        printf 'Error: missing %s/bids/dataset_description.json\n' "$DIR" >&2
         exit 1
     fi
 
     if [[ ! -f "${DIR}/license.txt" ]]
     then
-        printf 'Error: missing freesurfer license %s/license.txt\n' "$DIR" >%2
+        printf 'Error: missing freesurfer license %s/license.txt\n' "$DIR" >&2
         exit 1
     fi
 
