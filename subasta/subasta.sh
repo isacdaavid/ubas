@@ -132,6 +132,112 @@ parse_arguments() {
 }
 
 
+# Check if first argument conforms to integer regex.
+is_positive_integer() {
+    [[ "$1" =~ ^[1-9][0-9]*$ ]]
+}
+
+
+# Validate options meant to contain numerical values.
+validate_numeric_options() {
+    if ! is_positive_integer "$ATTEMPTS_PER_SUBJECT"
+    then
+        echo 'Error: --attempts-per-subject must be a positive integer.' >&2
+        exit 1
+    fi
+
+    if ! is_positive_integer "$ATTEMPTS_SLEEP_PERIOD"
+    then
+        echo 'Error: --attempts-sleep-period must be a nonnegative integer.' >&2
+        exit 1
+    fi
+
+    if ! is_positive_integer "$CONTAINER_MEMORY"
+    then
+        echo 'Error: --container-memory must be a positive integer.' >&2
+        exit 1
+    fi
+
+    if ! is_positive_integer "$CONTAINER_THREADS"
+    then
+        echo 'Error: --container-threads must be a positive integer.' >&2
+        exit 1
+    fi
+
+    if ! is_positive_integer "$PARALLEL_SUBJECTS"
+    then
+        echo 'Error: --parallel-subjects must be a positive integer.' >&2
+        exit 1
+    fi
+}
+
+
+validate_directory() {
+    if [[ ! -d "$DIR" ]]
+    then
+        printf 'Error: directory not found: %s\n' "$DIR" >&2
+        exit 1
+    fi
+
+    if [[ ! -w "$DIR" ]]
+    then
+        printf 'Error: directory is not writable: %s\n' "$DIR" >&2
+        exit 1
+    fi
+
+    if [[ ! -d "${DIR}/bids" ]]
+    then
+        printf 'Error: missing BIDS directory: %s/bids\n' "$DIR" >&2
+        exit 1
+    fi
+
+    if [[ ! -f "${DIR}/bids/dataset_description.json" ]]
+    then
+        printf 'Error: missing %s/bids/dataset_description.json\n' "$DIR" >%2
+        exit 1
+    fi
+
+    if [[ ! -f "${DIR}/license.txt" ]]
+    then
+        printf 'Error: missing freesurfer license %s/license.txt\n' "$DIR" >%2
+        exit 1
+    fi
+
+    if [[ "$WORKFLOW" == xcpd && ! -f "${DIR}/xcpd.yml" ]]
+    then
+        printf 'Error: missing nuisance regressors: %s/xcpd.yml\n' "$DIR" >%2
+        exit 1
+    fi
+}
+
+
+# Check command existence.
+require_command() {
+    command -v "$1" > /dev/null 2>&1 || {
+        printf 'Error: required command not found: %s\n' "$1" >&2
+        exit 1
+    }
+}
+
+
+# Basic check for external dependencies.
+validate_environment() {
+    require_command docker
+    require_command grep
+    require_command awk
+    require_command free
+    require_command nproc
+}
+
+
+# Master validator.
+validate_arguments() {
+    validate_numeric_options
+    validate_directory
+    validate_environment
+}
+
+
 # Configure workspace-specific globals.
 configure_workflow() {
     case "$WORKFLOW" in
@@ -315,13 +421,13 @@ run_xcpd() {
 
 # Run qsirecon for some subject
 run_qsirecon() {
-    sub=$1
-    attempts=$2
-    attempt=$((ATTEMPTS_PER_SUBJECT - $attempts + 1))
+    local sub=$1
+    local attempts=$2
+    local attempt=$((ATTEMPTS_PER_SUBJECT - $attempts + 1))
     log_attempt "$sub" "$attempt"
-    yes | mv "${DERIVATIVES}/${sub}"/ses*/anat \
+    mv -f -- "${DERIVATIVES}/${sub}"/ses*/anat \
              "${DERIVATIVES}/${sub}"/anat.old > /dev/null
-    yes | cp -r "${DERIVATIVES}/${sub}"/"$sub"/anat \
+    cp -rf -- "${DERIVATIVES}/${sub}"/"$sub"/anat \
              "${DERIVATIVES}/${sub}"/ses*/ > /dev/null
     # NOTE: qsirecon's argument parsing is buggy, changing option
     # order might break things.
@@ -348,7 +454,7 @@ run_qsirecon() {
 # Remove .html and directory under $DERIVATIVES for some subject.
 delete_derivative() {
     local sub=$1
-    yes | rm -r "${DERIVATIVES}/${sub}"{,.html} > /dev/null 2>&1
+    rm -rf -- "${DERIVATIVES}/${sub}"{,.html} > /dev/null 2>&1
 }
 
 
@@ -356,7 +462,7 @@ delete_derivative() {
 # (lower disk usage when working with copy outside SAMBA volume).
 delete_original() {
     local sub=$1
-    yes | rm -r "${ORIGINALS}/${sub}" > /dev/null 2>&1
+    rm -rf -- "${ORIGINALS}/${sub}" > /dev/null 2>&1
 }
 
 
@@ -365,7 +471,7 @@ delete_original() {
 delete_original_freesurfer() {
     local sub=$1
     local fs_dir="${DIR}/bids/derivatives/fmriprep/sourcedata/freesurfer/${sub}"
-    yes | rm -r "$fs_dir" > /dev/null 2>&1
+    rm -rf -- "$fs_dir" > /dev/null 2>&1
 }
 
 
@@ -419,7 +525,10 @@ main() {
         exit 1
     fi
 
-    local subjects=($(ls -d "$ORIGINALS"/sub-* 2> /dev/null | grep -v html))
+    local -a subjects
+    mapfile -t subjects < <(
+        find "$ORIGINALS" -maxdepth 1 -type d -name 'sub-*'
+    )
 
     if [[ ${#subjects[@]} -eq 0 ]]
     then
@@ -427,7 +536,7 @@ main() {
         exit 1
     fi
 
-    for sub in ${subjects[@]}
+    for sub in "${subjects[@]}"
     do
         # Remove basedir, we only want subject ID proper.
         local sub=${sub##*/}
@@ -455,6 +564,7 @@ main() {
 }
 
 parse_arguments "$@"
+validate_arguments
 configure_workflow
 
 main
