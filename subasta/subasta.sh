@@ -452,10 +452,11 @@ run_qsirecon() {
     local attempts=$2
     local attempt=$((ATTEMPTS_PER_SUBJECT - $attempts + 1))
     log_attempt "$sub" "$attempt"
-    mv -f -- "${DERIVATIVES}/${sub}"/ses*/anat \
-             "${DERIVATIVES}/${sub}"/anat.old > /dev/null
-    cp -rf -- "${DERIVATIVES}/${sub}"/"$sub"/anat \
-             "${DERIVATIVES}/${sub}"/ses*/ > /dev/null
+    # mv -f -- "${DERIVATIVES}/${sub}"/ses*/anat \
+    #          "${DERIVATIVES}/${sub}"/anat.old > /dev/null
+    # cp -rf -- "${DERIVATIVES}/${sub}"/"$sub"/anat \
+        #          "${DERIVATIVES}/${sub}"/ses*/ > /dev/null
+
     # NOTE: qsirecon's argument parsing is buggy, changing option
     # order might break things.
     # Don't quote atlases, they must arrive as separate arguments.
