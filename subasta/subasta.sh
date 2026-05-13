@@ -203,7 +203,7 @@ validate_directory() {
         exit 1
     fi
 
-    if [[ "$WORKFLOW" == xcpd && ! -f "${DIR}/xcpd.yml" ]]
+    if [[ "$WORKFLOW" == xcpd ]] && [[ ! -f "${DIR}/xcpd.yml" ]]
     then
         printf 'Error: missing nuisance regressors: %s/xcpd.yml\n' "$DIR" >%2
         exit 1
