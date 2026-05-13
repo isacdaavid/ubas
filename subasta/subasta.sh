@@ -148,7 +148,7 @@ validate_numeric_options() {
 
     if ! is_positive_integer "$ATTEMPTS_SLEEP_PERIOD"
     then
-        echo 'Error: --attempts-sleep-period must be a nonnegative integer.' >&2
+        echo 'Error: --attempts-sleep-period must be a positive integer.' >&2
         exit 1
     fi
 
@@ -175,7 +175,7 @@ validate_numeric_options() {
 validate_directory() {
     if [[ ! -d "$DIR" ]]
     then
-        printf 'Error: directory not found: %s\n' "$DIR" >&2
+        echo 'Error: directory not found: %s\n' "$DIR" >&2
         exit 1
     fi
 
@@ -238,27 +238,51 @@ validate_arguments() {
 }
 
 
+# Ensure docker image exists locally.
+# Pull image if absent.
+require_docker_image() {
+    local image=$1
+
+    if ! docker image inspect "$image" > /dev/null 2>&1
+    then
+        printf 'Docker image not found locally: %s\n' "$image" >&2
+        printf 'Pulling image...\n' >&2
+
+        if ! docker pull "$image"
+        then
+            printf 'Error: failed to pull docker image: %s\n' "$image" >&2
+            exit 1
+        fi
+    fi
+}
+
+
 # Configure workspace-specific globals.
 configure_workflow() {
     case "$WORKFLOW" in
         fmriprep)
             declare -gA FMRIPREP
+            FMRIPREP[image]='nipreps/fmriprep:latest'
             FMRIPREP[cifti-output]=91k
             ORIGINALS_BASE="bids"
             ORIGINALS="${DIR}/${ORIGINALS_BASE}"
             DERIVATIVES_BASE="bids/derivatives/${WORKFLOW}"
             DERIVATIVES="${DIR}/${DERIVATIVES_BASE}/"
+            require_docker_image "${FMRIPREP[image]}"
             ;;
         qsiprep)
             declare -gA QSIPREP
+            QSIPREP[image]='pennlinc/qsiprep:latest'
             QSIPREP[output-resolution]=2
             ORIGINALS_BASE="bids"
             ORIGINALS="${DIR}/${ORIGINALS_BASE}"
             DERIVATIVES_BASE="derivatives/${WORKFLOW}"
             DERIVATIVES="${DIR}/${DERIVATIVES_BASE}/"
+            require_docker_image "${QSIPREP[image]}"
             ;;
         xcpd)
             declare -gA XCPD
+            XCPD[image]='pennlinc/xcp_d:latest'
             XCPD[file-format]=cifti
             XCPD[despike]=y               # re-interpolate extreme BOLD values.
             XCPD[nuisance-regressors]=xcpd.yml
@@ -292,9 +316,11 @@ configure_workflow() {
             ORIGINALS="${DIR}/${ORIGINALS_BASE}/"
             DERIVATIVES_BASE="bids/derivatives/${WORKFLOW}"
             DERIVATIVES="${DIR}/${DERIVATIVES_BASE}/"
+            require_docker_image "${XCPD[image]}"
             ;;
         qsirecon)
             declare -gA QSIRECON
+            QSIRECON[image]='pennlinc/qsirecon:latest'
             # TODO: turn into options.
             QSIRECON[recon-spec]=mrtrix_singleshell_ss3t_ACT-hsvs
             QSIRECON[derivatives]=qsirecon-MRtrix3_fork-SS3T_act-HSVS
@@ -312,6 +338,7 @@ configure_workflow() {
             ORIGINALS="${DIR}/${ORIGINALS_BASE}/"
             DERIVATIVES_BASE="bids/derivatives/${WORKFLOW}"
             DERIVATIVES="${DIR}/${DERIVATIVES_BASE}/"
+            require_docker_image "${QSIRECON[image]}"
             ;;
         *)
             echo "Error: unknown workflow $WORKFLOW." >&2
@@ -354,7 +381,7 @@ run_fmriprep() {
     log_attempt "$sub" "$attempt"
     docker run --cpus="$CONTAINER_THREADS" --memory="$CONTAINER_MEMORY"g \
            -u $(id -u):$(id -g) --rm -v "$DIR":/tmp \
-           --entrypoint=fmriprep nipreps/fmriprep:latest \
+           --entrypoint=fmriprep "${FMRIPREP[image]}" \
                --participant-label "$sub" \
                --fs-license-file license.txt \
                --cifti-output "${FMRIPREP[cifti-output]}" \
@@ -373,7 +400,7 @@ run_qsiprep() {
     log_attempt "$sub" "$attempt"
     docker run --cpus="$CONTAINER_THREADS" --memory="$CONTAINER_MEMORY"g \
            -u $(id -u):$(id -g) --rm -v "$DIR":/tmp \
-           --entrypoint=qsiprep pennlinc/qsiprep:latest \
+           --entrypoint=qsiprep "${QSIPREP[image]}" \
                --participant-label "$sub" \
                --fs-license-file license.txt \
                --output-resolution "${QSIPREP[output-resolution]}" \
@@ -393,7 +420,7 @@ run_xcpd() {
     # Don't quote atlases, they must arrive as separate arguments.
     docker run --cpus="$CONTAINER_THREADS" --memory="$CONTAINER_MEMORY"g \
            -u $(id -u):$(id -g) --rm -v "$DIR":/tmp \
-           --entrypoint=xcp_d pennlinc/xcp_d:latest \
+           --entrypoint=xcp_d "${XCPD[image]}" \
                --mode linc \
                --participant-label "$sub" \
                --input-type fmriprep \
@@ -437,7 +464,7 @@ run_qsirecon() {
            --rm \
            -v "$DIR":/tmp \
            -v "${QSIRECON[fs-subjects-dir]}":/tmp2 \
-           --entrypoint=qsirecon pennlinc/qsirecon:latest \
+           --entrypoint=qsirecon "${QSIRECON[image]}" \
                --participant-label "$sub" \
                --fs-license-file license.txt \
                --recon-spec "${QSIRECON[recon-spec]}" \
@@ -562,6 +589,7 @@ main() {
     # Wait for all background processes to finish
     wait
 }
+
 
 parse_arguments "$@"
 validate_arguments
