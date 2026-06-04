@@ -15,9 +15,9 @@ def optimizer(objective):
         *posargs,
         parameters: Sequence[str],
         bounds: Sequence[Tuple[float, float]],
-        maxiter: Optional[int] = 10,
+        maxiter: Optional[int] = 100,
         n_restarts: Optional[int] = 1,
-        method: str = 'Nelder-Mead',
+        method: str = 'COBYLA',
         **kwargs: Mapping[str, Any],
     ) -> dict:
         parameters_history = {p: [] for p in parameters}
