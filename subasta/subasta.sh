@@ -175,7 +175,7 @@ validate_numeric_options() {
 validate_directory() {
     if [[ ! -d "$DIR" ]]
     then
-        echo 'Error: directory not found: %s\n' "$DIR" >&2
+        printf 'Error: directory not found: %s\n' "$DIR" >&2
         exit 1
     fi
 
@@ -205,7 +205,7 @@ validate_directory() {
 
     if [[ "$WORKFLOW" == xcpd ]] && [[ ! -f "${DIR}/xcpd.yml" ]]
     then
-        printf 'Error: missing nuisance regressors: %s/xcpd.yml\n' "$DIR" >%2
+        printf 'Error: missing nuisance regressors: %s/xcpd.yml\n' "$DIR" >&2
         exit 1
     fi
 }
